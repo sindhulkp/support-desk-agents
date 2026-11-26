@@ -1,0 +1,4 @@
+# Third-party dependencies. Everything else is Python's standard library.
+openai>=1.0.0
+fastapi>=0.110
+uvicorn>=0.29

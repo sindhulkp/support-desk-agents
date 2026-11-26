@@ -1,0 +1,4 @@
+# Dev-only dependencies: running the tests and the API test client.
+# Install with: pip install -r requirements.txt -r dev-requirements.txt
+pytest>=8.0
+httpx>=0.27

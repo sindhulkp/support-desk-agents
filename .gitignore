@@ -1,0 +1,17 @@
+# Secrets — never commit a real API key.
+.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Runtime data created when the desk runs (local only, not part of the repo)
+memory.json
+results.json
+
+# Test cache
+.pytest_cache/

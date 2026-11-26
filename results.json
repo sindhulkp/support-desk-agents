@@ -1,0 +1,69 @@
+{
+  "T-1002": {
+    "ticket": {
+      "customer_id": "C-102",
+      "customer_name": "Arjun Mehta",
+      "id": "T-1002",
+      "message": "Hello, I forgot my password and requested a reset link three times, but I never receive the email. I checked spam and junk too. I cannot log in to my account at all. Can you help me reset my password?",
+      "subject": "Cannot log in \u2014 password reset email never arrives"
+    },
+    "classification": {
+      "category": "technical",
+      "priority": "high",
+      "sentiment": "neutral"
+    },
+    "retrieved": [
+      {
+        "title": "Password Reset",
+        "score": 33.66
+      },
+      {
+        "title": "Refund Policy",
+        "score": 6.91
+      },
+      {
+        "title": "Delivery Tracking",
+        "score": 6.08
+      }
+    ],
+    "reply": "Hi, thanks for getting in touch \u2014 here's what I found in our help articles:\n\n[1] Password Reset: 1. Go to the login page and click \"Forgot password\". 2. Enter the email address linked to your account. 3. You will receive a reset link by email within 5 minutes. 4. Click the link and choose a new password (at least 8 ...\n[2] Refund Policy: You can return any unused item within 30 days of delivery for a full refund. Refunds are sent to the original payment method. Once your return is received at our warehouse, the refund is processed within 5\u201310 business da...\n[3] Delivery Tracking: 1. Log in to your account and open My Orders. 2. Click Track Package next to your order to see live tracking. 3. You can also track with the tracking number on the carrier's website. It is normal for tracking to stay on ...\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "processed_at": "2026-11-26T18:13:03.603706+00:00"
+  },
+  "T-1001": {
+    "ticket": {
+      "customer_id": "C-101",
+      "customer_name": "Priya Sharma",
+      "expected": {
+        "articles": [
+          "Cancelling Your Subscription",
+          "Refund Policy"
+        ],
+        "category": "billing"
+      },
+      "id": "T-1001",
+      "message": "Hi, I was charged twice for my monthly subscription on the same day. I can see two identical charges of $19.99 on my card statement. This is urgent, please refund the extra charge as soon as possible. I am very frustrated because this is the second time it has happened.",
+      "subject": "Charged twice for my subscription this month"
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "high",
+      "sentiment": "negative"
+    },
+    "retrieved": [
+      {
+        "title": "Cancelling Your Subscription",
+        "score": 18.48
+      },
+      {
+        "title": "Refund Policy",
+        "score": 15.7
+      },
+      {
+        "title": "Damaged Item",
+        "score": 4.68
+      }
+    ],
+    "reply": "Hi, thanks for getting in touch \u2014 here's what I found in our help articles:\n\n[1] Cancelling Your Subscription: 1. Log in to your account and go to Settings \u2192 Subscription. 2. Click Cancel Subscription and confirm. 3. Your subscription stays active until the end of the current billing period \u2014 you will not be charged again. Cancel...\n[2] Refund Policy: You can return any unused item within 30 days of delivery for a full refund. Refunds are sent to the original payment method. Once your return is received at our warehouse, the refund is processed within 5\u201310 business da...\n[3] Damaged Item: 1. Take photos of the damaged item and the packaging. 2. Contact support within 7 days of delivery with your order number and the photos. 3. We will offer a free replacement or a full refund \u2014 your choice. The replacemen...\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "processed_at": "2026-11-26T18:14:41.556143+00:00"
+  }
+}
