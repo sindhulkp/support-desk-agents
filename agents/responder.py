@@ -26,17 +26,32 @@ Write a short, polite reply to the customer. Follow these rules strictly:
 4. Keep the reply under 150 words. Be warm and direct.
 5. If the customer has written before (see CUSTOMER HISTORY), acknowledge
    it briefly in one sentence at the start of the reply.
+6. If ORDER DETAILS are provided, they are the facts about the customer's
+   order: state its real status, the items, and the estimated delivery
+   date, and cite the order as [Order ORD-1001]. Never state a status,
+   tracking number, or delivery date that is not in those details.
+7. If ORDER LOOKUP says the order could not be found, say clearly that
+   you could not find that order number and ask the customer to check
+   it. Never invent a status, tracking number, or delivery date for an
+   order that does not exist.
 """
+
+from .order_lookup import format_order
 
 
 def draft_reply(llm, ticket, retrieved_docs, prior_tickets=0,
-                prior_categories=None):
+                prior_categories=None, order=None, order_id_mentioned=None):
     """Draft a reply. retrieved_docs is a list of (doc, score) from BM25.
 
     prior_tickets: how many times this customer has written before.
     prior_categories: the categories of those earlier tickets.
     Both come from the orchestrator's memory — the reply is written
     knowing the customer's history, not as if every ticket is the first.
+    order: the order dict from the order lookup, or None.
+    order_id_mentioned: the order id the customer wrote, or None.
+    When the customer mentioned an order id but no such order exists,
+    the prompt says so plainly — the reply must then be an honest
+    "I couldn't find that order", never an invented status.
     Returns the reply text.
     """
     if retrieved_docs:
@@ -46,6 +61,17 @@ def draft_reply(llm, ticket, retrieved_docs, prior_tickets=0,
         )
     else:
         articles_text = "NO RELEVANT ARTICLES FOUND"
+
+    if order is not None:
+        order_text = f"\n\nORDER DETAILS:\n{format_order(order)}"
+    elif order_id_mentioned is not None:
+        order_text = (
+            f"\n\nORDER LOOKUP: The customer mentioned order "
+            f"{order_id_mentioned}, but no order with that number exists "
+            f"in the system. Do not invent a status or delivery date for it."
+        )
+    else:
+        order_text = ""
 
     history_text = ""
     if prior_tickets > 0:
@@ -63,6 +89,7 @@ def draft_reply(llm, ticket, retrieved_docs, prior_tickets=0,
             "content": (
                 f"CUSTOMER TICKET:\n{ticket['subject']}\n{ticket['message']}\n\n"
                 f"RETRIEVED ARTICLES:\n{articles_text}"
+                f"{order_text}"
                 f"{history_text}"
             ),
         },

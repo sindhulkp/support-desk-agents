@@ -76,13 +76,23 @@
       <div><b>2. Retriever</b>Searches the help articles and pulls the three most relevant ones. If nothing really matches, it says so.</div>
       <div><b>3. Responder</b>Drafts a reply using only those articles, with citations — or says “I don’t know” and flags it for a human.</div>
     </div>
-    <p class="muted">What makes it different: a measured relevance threshold (10.0) so weak matches never produce an answer; memory that is actually used — repeat customers are recognised and repeat unhappy ones are escalated; and everything is measured — 21 tests, eval 9/9 classification, 9/9 retrieval, 1/1 honesty.</p>
+    <p class="muted">What makes it different: a measured relevance threshold (10.0) so weak matches never produce an answer; memory that is actually used — repeat customers are recognised and repeat unhappy ones are escalated; it looks up real orders by number (try “Where is my order #1001?”) instead of guessing about them; and everything is measured — 33 tests, eval 9/9 classification, 9/9 retrieval, 1/1 honesty, 2/2 order lookup.</p>
   </section>
 
   <section>
     <h2>Try it live</h2>
     <p class="muted">Pick a sample ticket, or write your own. This page talks to the real running service — no demo script.</p>
     <div class="chips" id="samples"></div>
+    <p class="muted">Tip: ask about a real order — try “Where is my order #1001?”
+       ORD-1001 is a real order in the shop's system, so the desk answers
+       with its actual status, items, and delivery date. Try #9999 to see
+       what happens when the order does not exist.</p>
+    <label for="name">Your name (optional)</label>
+    <input type="text" id="name" placeholder="e.g. Jordan Lee">
+    <label for="email">Email (optional)</label>
+    <input type="text" id="email" placeholder="e.g. jordan@example.com">
+    <p class="muted">Name and email are only used to recognise you if you write again —
+       leave them blank and the ticket is treated as a first contact.</p>
     <label for="subject">Subject</label>
     <input type="text" id="subject" placeholder="e.g. Charged twice for my subscription">
     <label for="message">Message</label>
@@ -95,6 +105,7 @@
   <section class="result" id="result">
     <h2>Result</h2>
     <div id="classification"></div>
+    <div id="order"></div>
     <div id="escalation"></div>
     <h3>Articles found</h3>
     <ul id="articles"></ul>
@@ -130,7 +141,7 @@ const SAMPLES = [
   { id: "T-1002", subject: "Cannot log in — password reset email never arrives",
     message: "Hello, I forgot my password and requested a reset link three times, but I never receive the email. I checked spam and junk too. I cannot log in to my account at all. Can you help me reset my password?" },
   { id: "T-1003", subject: "Order tracking stuck for 5 days",
-    message: "My order was shipped a week ago but the tracking page still says 'label created' and has not moved in 5 days. The delivery was supposed to arrive yesterday. Could you please check where my package is?" },
+    message: "My order was shipped a week ago but the tracking page still says 'label created' and has not moved in 5 days. The delivery was supposed to arrive yesterday. My order number is ORD-1003. Could you please check where my package is?" },
   { id: "T-1004", subject: "Damaged item received — headphones arrived broken",
     message: "I just received my headphones and one earcup is cracked. The box was also dented. I am really disappointed. I would like a replacement or a refund, please. I have photos of the damage if you need them." },
   { id: "T-1005", subject: "Where is my refund? It has been 10 days",
@@ -222,9 +233,13 @@ async function runPipeline() {
   const btn = document.getElementById("runBtn");
   btn.disabled = true; btn.textContent = "Agents are working…";
   try {
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
     const body = selectedId && document.getElementById("subject").value === SAMPLES.find(s => s.id === selectedId).subject
       ? { ticket_id: selectedId }
-      : { subject, message };
+      : { subject, message,
+          ...(name ? { customer_name: name } : {}),
+          ...(email ? { customer_email: email } : {}) };
     const res = await fetch("/tickets", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -236,6 +251,20 @@ async function runPipeline() {
       '<span class="badge ' + c.category + '">' + c.category + '</span>' +
       '<span class="badge ' + c.priority + '">priority: ' + c.priority + '</span>' +
       '<span class="badge ' + c.sentiment + '">sentiment: ' + c.sentiment + '</span>';
+    const orderEl = document.getElementById("order");
+    if (data.order) {
+      const o = data.order;
+      orderEl.innerHTML = '<div class="ok"><b>Order found: ' + o.order_id +
+        ' — ' + o.status + '</b><br>Items: ' +
+        o.items.map(i => i.name + ' ×' + i.qty + ' ($' + i.price.toFixed(2) + ')').join(', ') +
+        '<br>Total: $' + o.total.toFixed(2) + ' · ' + o.carrier + ' ' + o.tracking_number +
+        '<br>Estimated delivery: ' + o.estimated_delivery + '</div>';
+    } else if (data.order_id_mentioned) {
+      orderEl.innerHTML = '<div class="escalate">Order ' + data.order_id_mentioned +
+        ' was not found in the system — the reply says so honestly instead of inventing a status.</div>';
+    } else {
+      orderEl.innerHTML = '';
+    }
     document.getElementById("escalation").innerHTML = data.needs_human_review
       ? '<div class="escalate">Human review needed — ' + data.escalation_reason + '</div>'
       : '<div class="ok">No escalation — safe to send the draft reply.</div>';

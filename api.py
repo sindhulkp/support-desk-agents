@@ -15,8 +15,15 @@ Run it:
 POST body — either run a sample ticket by id:
   {"ticket_id": "T-1001"}
 or send a ticket inline (subject and message are required):
-  {"id": "WEB-1", "customer_id": "C-200", "customer_name": "Sam",
+  {"id": "WEB-1", "customer_name": "Sam", "customer_email": "sam@example.com",
    "subject": "Where is my refund?", "message": "I returned my order..."}
+
+How a customer is identified: an email (lowercased) becomes the
+customer id, so the same person writing twice is recognised as a
+repeat customer. A name alone becomes a "C-first-last" id. With
+neither, the ticket is anonymous — it is processed, but no history
+is recorded and the reply never claims a repeat visit that did not
+happen. Sample tickets (ticket_id) keep their own customer ids.
 
 How the LLM is chosen: if LLM_API_KEY is set in the environment (or a
 .env file), the real LLM is used; otherwise the built-in mock LLM runs
@@ -28,6 +35,7 @@ internet as it is.
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
@@ -101,8 +109,30 @@ class TicketRequest(BaseModel):
     id: str | None = None              # inline ticket id (default: auto)
     customer_id: str = "C-API"
     customer_name: str = "API Customer"
+    customer_email: str | None = None  # when given, this identifies the customer
     subject: str = ""
     message: str = ""
+
+
+def _customer_identity(body: TicketRequest):
+    """Work out who an inline ticket is from.
+
+    Priority: email (lowercased) > an explicitly sent customer_id >
+    a slug of the name > nothing at all. "Nothing" is a real answer:
+    an anonymous ticket gets customer_id None, so the pipeline records
+    no history for it and can never mistake two strangers for one
+    repeat customer.
+    """
+    email = (body.customer_email or "").strip().lower() or None
+    name = (body.customer_name or "").strip() or None
+    if email:
+        return email, name or "Guest"
+    if body.customer_id and body.customer_id != "C-API":
+        return body.customer_id, name or "Guest"
+    if name and name != "API Customer":
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        return f"C-{slug}", name
+    return None, "Guest"
 
 
 # -- endpoints ----------------------------------------------------------------
@@ -135,10 +165,11 @@ def process_ticket(body: TicketRequest):
                 status_code=404, detail=f"sample ticket {body.ticket_id} not found"
             )
     elif body.subject and body.message:
+        customer_id, customer_name = _customer_identity(body)
         ticket = {
             "id": body.id or f"API-{len(_RESULTS) + 1}",
-            "customer_id": body.customer_id,
-            "customer_name": body.customer_name,
+            "customer_id": customer_id,
+            "customer_name": customer_name,
             "subject": body.subject,
             "message": body.message,
         }
@@ -196,7 +227,9 @@ def stats():
             escalated += 1
         if not result.get("retrieved"):
             dont_know += 1
-        customers.add(result["ticket"]["customer_id"])
+        # Anonymous tickets (customer_id None) are not a "customer seen".
+        if result["ticket"].get("customer_id"):
+            customers.add(result["ticket"]["customer_id"])
         recent.append({
             "id": ticket_id,
             "subject": result["ticket"]["subject"],

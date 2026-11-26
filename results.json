@@ -1,69 +1,557 @@
 {
-  "T-1002": {
+  "API-1": {
     "ticket": {
-      "customer_id": "C-102",
-      "customer_name": "Arjun Mehta",
-      "id": "T-1002",
-      "message": "Hello, I forgot my password and requested a reset link three times, but I never receive the email. I checked spam and junk too. I cannot log in to my account at all. Can you help me reset my password?",
-      "subject": "Cannot log in \u2014 password reset email never arrives"
+      "id": "API-1",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #1001?",
+      "message": "Hi, where is my order #1001? It was supposed to arrive already."
     },
     "classification": {
-      "category": "technical",
-      "priority": "high",
+      "category": "shipping",
+      "priority": "low",
       "sentiment": "neutral"
     },
-    "retrieved": [
-      {
-        "title": "Password Reset",
-        "score": 33.66
-      },
-      {
-        "title": "Refund Policy",
-        "score": 6.91
-      },
-      {
-        "title": "Delivery Tracking",
-        "score": 6.08
-      }
-    ],
-    "reply": "Hi, thanks for getting in touch \u2014 here's what I found in our help articles:\n\n[1] Password Reset: 1. Go to the login page and click \"Forgot password\". 2. Enter the email address linked to your account. 3. You will receive a reset link by email within 5 minutes. 4. Click the link and choose a new password (at least 8 ...\n[2] Refund Policy: You can return any unused item within 30 days of delivery for a full refund. Refunds are sent to the original payment method. Once your return is received at our warehouse, the refund is processed within 5\u201310 business da...\n[3] Delivery Tracking: 1. Log in to your account and open My Orders. 2. Click Track Package next to your order to see live tracking. 3. You can also track with the tracking number on the carrier's website. It is normal for tracking to stay on ...\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
-    "processed_at": "2026-11-26T18:13:03.603706+00:00"
-  },
-  "T-1001": {
-    "ticket": {
+    "retrieved": [],
+    "reply": "Hi, thanks for getting in touch \u2014 here's the status of your order [Order ORD-1001]:\n\nStatus: Shipped\nItems: Wireless Keyboard x1 ($49.99), Mouse Pad x1 ($12.99)\nTotal: $62.98\nCarrier: FastShip, tracking FS-88122334\nEstimated delivery: 2026-11-27\n\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "prior_tickets": 0,
+    "order": {
+      "carrier": "FastShip",
+      "city": "Boca Raton",
       "customer_id": "C-101",
       "customer_name": "Priya Sharma",
-      "expected": {
-        "articles": [
-          "Cancelling Your Subscription",
-          "Refund Policy"
-        ],
-        "category": "billing"
-      },
-      "id": "T-1001",
-      "message": "Hi, I was charged twice for my monthly subscription on the same day. I can see two identical charges of $19.99 on my card statement. This is urgent, please refund the extra charge as soon as possible. I am very frustrated because this is the second time it has happened.",
-      "subject": "Charged twice for my subscription this month"
+      "email": "priya.sharma@example.com",
+      "estimated_delivery": "2026-11-27",
+      "items": [
+        {
+          "name": "Wireless Keyboard",
+          "price": 49.99,
+          "qty": 1
+        },
+        {
+          "name": "Mouse Pad",
+          "price": 12.99,
+          "qty": 1
+        }
+      ],
+      "order_date": "2026-11-20",
+      "order_id": "ORD-1001",
+      "status": "Shipped",
+      "total": 62.98,
+      "tracking_number": "FS-88122334"
+    },
+    "order_id_mentioned": "ORD-1001",
+    "needs_human_review": false,
+    "escalation_reason": null,
+    "processed_at": "2026-11-26T22:28:46.457184+00:00"
+  },
+  "API-2": {
+    "ticket": {
+      "id": "API-2",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #9999?",
+      "message": "Hi, where is my order #9999? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our order system and I couldn't find order ORD-9999 \u2014 please double-check the order number (it should look like ORD-1001) and write back. If the number is right, I can pass this to a human support agent who will look into it.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": "ORD-9999",
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:25:29.608448+00:00"
+  },
+  "API-3": {
+    "ticket": {
+      "id": "API-3",
+      "customer_id": "jordan@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Charged twice",
+      "message": "I was charged twice for my subscription, please refund me."
     },
     "classification": {
       "category": "billing",
       "priority": "high",
-      "sentiment": "negative"
+      "sentiment": "neutral"
     },
-    "retrieved": [
-      {
-        "title": "Cancelling Your Subscription",
-        "score": 18.48
-      },
-      {
-        "title": "Refund Policy",
-        "score": 15.7
-      },
-      {
-        "title": "Damaged Item",
-        "score": 4.68
-      }
-    ],
-    "reply": "Hi, thanks for getting in touch \u2014 here's what I found in our help articles:\n\n[1] Cancelling Your Subscription: 1. Log in to your account and go to Settings \u2192 Subscription. 2. Click Cancel Subscription and confirm. 3. Your subscription stays active until the end of the current billing period \u2014 you will not be charged again. Cancel...\n[2] Refund Policy: You can return any unused item within 30 days of delivery for a full refund. Refunds are sent to the original payment method. Once your return is received at our warehouse, the refund is processed within 5\u201310 business da...\n[3] Damaged Item: 1. Take photos of the damaged item and the packaging. 2. Contact support within 7 days of delivery with your order number and the photos. 3. We will offer a free replacement or a full refund \u2014 your choice. The replacemen...\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
-    "processed_at": "2026-11-26T18:14:41.556143+00:00"
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:25:29.612007+00:00"
+  },
+  "API-4": {
+    "ticket": {
+      "id": "API-4",
+      "customer_id": "jordan@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Where is my refund?",
+      "message": "I returned my order two weeks ago and still have no refund."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "I can see you've written to us 1 time(s) before \u2014 thank you for your patience while we sort this out.\n\nHi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 1,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:25:29.615079+00:00"
+  },
+  "API-5": {
+    "ticket": {
+      "id": "API-5",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Do you accept PayPal?",
+      "message": "Hi, do you accept PayPal as a payment method?"
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:25:29.618534+00:00"
+  },
+  "API-6": {
+    "ticket": {
+      "id": "API-6",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #1001?",
+      "message": "Hi, where is my order #1001? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for getting in touch \u2014 here's the status of your order [Order ORD-1001]:\n\nStatus: Shipped\nItems: Wireless Keyboard x1 ($49.99), Mouse Pad x1 ($12.99)\nTotal: $62.98\nCarrier: FastShip, tracking FS-88122334\nEstimated delivery: 2026-11-27\n\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "prior_tickets": 0,
+    "order": {
+      "carrier": "FastShip",
+      "city": "Boca Raton",
+      "customer_id": "C-101",
+      "customer_name": "Priya Sharma",
+      "email": "priya.sharma@example.com",
+      "estimated_delivery": "2026-11-27",
+      "items": [
+        {
+          "name": "Wireless Keyboard",
+          "price": 49.99,
+          "qty": 1
+        },
+        {
+          "name": "Mouse Pad",
+          "price": 12.99,
+          "qty": 1
+        }
+      ],
+      "order_date": "2026-11-20",
+      "order_id": "ORD-1001",
+      "status": "Shipped",
+      "total": 62.98,
+      "tracking_number": "FS-88122334"
+    },
+    "order_id_mentioned": "ORD-1001",
+    "needs_human_review": false,
+    "escalation_reason": null,
+    "processed_at": "2026-11-26T22:26:32.264332+00:00"
+  },
+  "API-7": {
+    "ticket": {
+      "id": "API-7",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #9999?",
+      "message": "Hi, where is my order #9999? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our order system and I couldn't find order ORD-9999 \u2014 please double-check the order number (it should look like ORD-1001) and write back. If the number is right, I can pass this to a human support agent who will look into it.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": "ORD-9999",
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:32.268086+00:00"
+  },
+  "API-8": {
+    "ticket": {
+      "id": "API-8",
+      "customer_id": "jordan@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Charged twice",
+      "message": "I was charged twice for my subscription, please refund me."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "high",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "I can see you've written to us 2 time(s) before \u2014 thank you for your patience while we sort this out.\n\nHi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 2,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:32.274710+00:00"
+  },
+  "API-9": {
+    "ticket": {
+      "id": "API-9",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #1001?",
+      "message": "Hi, where is my order #1001? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for getting in touch \u2014 here's the status of your order [Order ORD-1001]:\n\nStatus: Shipped\nItems: Wireless Keyboard x1 ($49.99), Mouse Pad x1 ($12.99)\nTotal: $62.98\nCarrier: FastShip, tracking FS-88122334\nEstimated delivery: 2026-11-27\n\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "prior_tickets": 0,
+    "order": {
+      "carrier": "FastShip",
+      "city": "Boca Raton",
+      "customer_id": "C-101",
+      "customer_name": "Priya Sharma",
+      "email": "priya.sharma@example.com",
+      "estimated_delivery": "2026-11-27",
+      "items": [
+        {
+          "name": "Wireless Keyboard",
+          "price": 49.99,
+          "qty": 1
+        },
+        {
+          "name": "Mouse Pad",
+          "price": 12.99,
+          "qty": 1
+        }
+      ],
+      "order_date": "2026-11-20",
+      "order_id": "ORD-1001",
+      "status": "Shipped",
+      "total": 62.98,
+      "tracking_number": "FS-88122334"
+    },
+    "order_id_mentioned": "ORD-1001",
+    "needs_human_review": false,
+    "escalation_reason": null,
+    "processed_at": "2026-11-26T22:26:40.850287+00:00"
+  },
+  "API-10": {
+    "ticket": {
+      "id": "API-10",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #9999?",
+      "message": "Hi, where is my order #9999? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our order system and I couldn't find order ORD-9999 \u2014 please double-check the order number (it should look like ORD-1001) and write back. If the number is right, I can pass this to a human support agent who will look into it.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": "ORD-9999",
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:40.855546+00:00"
+  },
+  "API-11": {
+    "ticket": {
+      "id": "API-11",
+      "customer_id": "jordan-1795732000@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Charged twice",
+      "message": "I was charged twice for my subscription, please refund me."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "high",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:40.861730+00:00"
+  },
+  "API-12": {
+    "ticket": {
+      "id": "API-12",
+      "customer_id": "jordan-1795732000@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Where is my refund?",
+      "message": "I returned my order two weeks ago and still have no refund."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "I can see you've written to us 1 time(s) before \u2014 thank you for your patience while we sort this out.\n\nHi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 1,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:40.873774+00:00"
+  },
+  "API-13": {
+    "ticket": {
+      "id": "API-13",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Do you accept PayPal?",
+      "message": "Hi, do you accept PayPal as a payment method?"
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:26:40.878541+00:00"
+  },
+  "API-14": {
+    "ticket": {
+      "id": "API-14",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #1001?",
+      "message": "Hi, where is my order #1001? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for getting in touch \u2014 here's the status of your order [Order ORD-1001]:\n\nStatus: Shipped\nItems: Wireless Keyboard x1 ($49.99), Mouse Pad x1 ($12.99)\nTotal: $62.98\nCarrier: FastShip, tracking FS-88122334\nEstimated delivery: 2026-11-27\n\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "prior_tickets": 0,
+    "order": {
+      "carrier": "FastShip",
+      "city": "Boca Raton",
+      "customer_id": "C-101",
+      "customer_name": "Priya Sharma",
+      "email": "priya.sharma@example.com",
+      "estimated_delivery": "2026-11-27",
+      "items": [
+        {
+          "name": "Wireless Keyboard",
+          "price": 49.99,
+          "qty": 1
+        },
+        {
+          "name": "Mouse Pad",
+          "price": 12.99,
+          "qty": 1
+        }
+      ],
+      "order_date": "2026-11-20",
+      "order_id": "ORD-1001",
+      "status": "Shipped",
+      "total": 62.98,
+      "tracking_number": "FS-88122334"
+    },
+    "order_id_mentioned": "ORD-1001",
+    "needs_human_review": false,
+    "escalation_reason": null,
+    "processed_at": "2026-11-26T22:27:51.811835+00:00"
+  },
+  "API-15": {
+    "ticket": {
+      "id": "API-15",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #9999?",
+      "message": "Hi, where is my order #9999? I placed it last week."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our order system and I couldn't find order ORD-9999 \u2014 please double-check the order number (it should look like ORD-1001) and write back. If the number is right, I can pass this to a human support agent who will look into it.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": "ORD-9999",
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:27:51.815729+00:00"
+  },
+  "API-16": {
+    "ticket": {
+      "id": "API-16",
+      "customer_id": "jordan-1795732071@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Charged twice",
+      "message": "I was charged twice for my subscription, please refund me."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "high",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:27:51.824763+00:00"
+  },
+  "API-17": {
+    "ticket": {
+      "id": "API-17",
+      "customer_id": "jordan-1795732071@example.com",
+      "customer_name": "Jordan Lee",
+      "subject": "Where is my refund?",
+      "message": "I returned my order two weeks ago and still have no refund."
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "I can see you've written to us 1 time(s) before \u2014 thank you for your patience while we sort this out.\n\nHi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 1,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:27:51.833571+00:00"
+  },
+  "API-18": {
+    "ticket": {
+      "id": "API-18",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Do you accept PayPal?",
+      "message": "Hi, do you accept PayPal as a payment method?"
+    },
+    "classification": {
+      "category": "billing",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our help articles and I don't have information about this in our knowledge base, so I don't want to guess. I've passed your ticket to a human support agent who will follow up with you shortly.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": null,
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:27:51.841217+00:00"
+  },
+  "API-19": {
+    "ticket": {
+      "id": "API-19",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #9999?",
+      "message": "Hi, where is my order #9999?"
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for reaching out. I checked our order system and I couldn't find order ORD-9999 \u2014 please double-check the order number (it should look like ORD-1001) and write back. If the number is right, I can pass this to a human support agent who will look into it.",
+    "prior_tickets": 0,
+    "order": null,
+    "order_id_mentioned": "ORD-9999",
+    "needs_human_review": true,
+    "escalation_reason": "No help article answers this ticket \u2014 the desk said 'I don't know' instead of guessing.",
+    "processed_at": "2026-11-26T22:28:46.462108+00:00"
+  },
+  "API-20": {
+    "ticket": {
+      "id": "API-20",
+      "customer_id": null,
+      "customer_name": "Guest",
+      "subject": "Where is my order #1003?",
+      "message": "My order number is ORD-1003, it has been stuck for days."
+    },
+    "classification": {
+      "category": "shipping",
+      "priority": "low",
+      "sentiment": "neutral"
+    },
+    "retrieved": [],
+    "reply": "Hi, thanks for getting in touch \u2014 here's the status of your order [Order ORD-1003]:\n\nStatus: Delayed\nItems: Running Shoes x1 ($79.99)\nTotal: $79.99\nCarrier: FastShip, tracking FS-88001122\nEstimated delivery: 2026-11-25\n\n\nIf those steps don't resolve it, please reply and let us know \u2014 we're happy to help further.",
+    "prior_tickets": 0,
+    "order": {
+      "carrier": "FastShip",
+      "city": "Chicago",
+      "customer_id": "C-103",
+      "customer_name": "Sofia Khan",
+      "email": "sofia.khan@example.com",
+      "estimated_delivery": "2026-11-25",
+      "items": [
+        {
+          "name": "Running Shoes",
+          "price": 79.99,
+          "qty": 1
+        }
+      ],
+      "order_date": "2026-11-18",
+      "order_id": "ORD-1003",
+      "status": "Delayed",
+      "total": 79.99,
+      "tracking_number": "FS-88001122"
+    },
+    "order_id_mentioned": "ORD-1003",
+    "needs_human_review": false,
+    "escalation_reason": null,
+    "processed_at": "2026-11-26T22:28:46.469717+00:00"
   }
 }

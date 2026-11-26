@@ -48,6 +48,15 @@ the ticket in a pipeline:
    "I don't know" and hands the ticket to a human — it never invents a
    policy.
 
+Between steps 2 and 3 there is one more tool call: the **order
+lookup**. If the ticket mentions an order number ("ORD-1001" or
+"#1001"), the desk looks it up in `data/orders.json` — a small
+database of real orders with live statuses — and the reply states
+that order's real status, items, and delivery date. If the number
+does not exist, the reply honestly says the order could not be
+found. That is what makes "Where is my order?" answerable about an
+actual order, instead of quoting a generic tracking article.
+
 Afterwards the system saves the ticket in `memory.json`, so the next
 time the same customer writes in, the desk knows their history.
 
@@ -66,8 +75,9 @@ Step 1: Classifier agent
 Step 2: Retriever agent (BM25)
   THINK:   Which help articles answer this ticket?
   ACT:     BM25 keyword search over the knowledge base
-  OBSERVE: top 3 articles: 'Cancelling Your Subscription' (score 18.48),
-           'Refund Policy' (score 15.70), 'Damaged Item' (score 4.68)
+  OBSERVE: top 3 articles: 'Cancelling Your Subscription' (score 20.27),
+           'Refund Policy' (score 17.98) — only two score above the 10.0
+           relevance threshold, so only two are returned
 
 Step 3: Responder agent
   THINK:   Draft a reply using only the retrieved articles.
@@ -136,19 +146,21 @@ natural "next step" for this project (see §9).
 | File | What it does | Key idea to remember |
 |---|---|---|
 | `main.py` | Command line: `--demo`, `--ticket T-1001`, `--mock` | The entry point; parses arguments and starts the desk |
-| `api.py` | FastAPI service: `GET /health`, `POST /tickets`, `GET /tickets/{id}` | The same pipeline, behind HTTP, so other programs can use it |
-| `eval.py` | Runs all 9 tickets in mock mode, prints accuracy + hit rate + honesty | Measurement: proves the pipeline works instead of claiming it |
+| `api.py` | FastAPI service: `GET /health`, `POST /tickets`, `GET /tickets/{id}`, `GET /stats` | The same pipeline, behind HTTP, so other programs can use it |
+| `eval.py` | Runs all 9 tickets in mock mode, prints accuracy + hit rate + honesty + order lookup | Measurement: proves the pipeline works instead of claiming it |
 | `config.py` | Central settings from env vars + `setup_logging()` | One place for config; values read on access, never hardcoded |
 | `llm.py` | `LLMClient` (real API) + `MockLLM` (fake, rule-based) | Only file that talks to an LLM; config comes from env vars only |
 | `tools.py` | Loads `tickets.json`, finds the knowledge folder, loads `.env` | Small helpers; "tools" are how agents touch the world |
 | `agents/classifier.py` | Sends ticket → LLM, asks for JSON | Structured output: JSON mode makes the answer machine-readable |
 | `agents/retriever.py` | `BM25Retriever` class | Pure-Python BM25; index built once at startup |
-| `agents/responder.py` | Sends ticket + articles → LLM | Grounded generation: only the retrieved facts, with citations |
-| `agents/orchestrator.py` | `SupportDesk.run()` — steps 1→2→3 + memory + log lines | The pipeline; prints THINK/ACT/OBSERVE, logs one line per step |
-| `tests/` | pytest: retriever, classifier, orchestrator, API | Tests pin the behaviour, so changes can't silently break it |
+| `agents/order_lookup.py` | Extracts an order id, looks it up in `orders.json` | A real tool: the desk answers from an actual order's status |
+| `agents/responder.py` | Sends ticket + articles + order → LLM | Grounded generation: only the retrieved facts, with citations |
+| `agents/orchestrator.py` | `SupportDesk.run()` — steps 1→2→3 + order lookup + memory + log lines | The pipeline; prints THINK/ACT/OBSERVE, logs one line per step |
+| `tests/` | pytest: retriever, classifier, orchestrator, API, orders | Tests pin the behaviour, so changes can't silently break it |
 | `.github/workflows/ci.yml` | CI: install, pytest, demo on every push | Automation: every push is checked, no key needed (mock mode) |
 | `Dockerfile` | Container for the API (`python:3.12-slim` + uvicorn) | Same code, same run, on any machine |
-| `data/tickets.json` | 9 sample tickets (billing, technical, shipping, returns) | Realistic input data — each ticket now has an `"expected"` label |
+| `data/tickets.json` | 9 sample tickets (billing, technical, shipping, returns) | Realistic input data — each ticket now has an `"expected"` label; T-1003 names its real order ORD-1003 |
+| `data/orders.json` | 8 real orders (ORD-1001–ORD-1008) with live statuses | The orders database the lookup answers from |
 | `knowledge/*.md` | 7 help articles (the RAG knowledge base) | Facts the responder is allowed to use |
 | `memory.json` | Created on first run | Per-customer ticket history |
 | `results.json` | Created by the API | Stored pipeline results, so `GET /tickets/{id}` can answer |
@@ -164,7 +176,8 @@ tickets.json ──┐
 main.py ──▶ SupportDesk.run(ticket)
                │  1. classifier.classify(llm, ticket) ──▶ LLM (JSON mode)
                │  2. retriever.search(ticket text) ──▶ knowledge/*.md (BM25)
-               │  3. responder.draft_reply(llm, ticket, docs) ──▶ LLM (grounded)
+               │  2b. order_lookup.find_order(order id) ──▶ data/orders.json
+               │  3. responder.draft_reply(llm, ticket, docs, order) ──▶ LLM (grounded)
                ▼
           draft reply printed + ticket saved to memory.json
 ```
@@ -208,6 +221,13 @@ curl -X POST http://127.0.0.1:8000/tickets -H "Content-Type: application/json" -
 # "The same three agents, now behind an HTTP endpoint — any other
 #  system can send a ticket and get the classification, the articles,
 #  and the draft reply back as JSON."
+
+# 6. Show the order lookup (30 seconds) — the moment that makes it real:
+curl -X POST http://127.0.0.1:8000/tickets -H "Content-Type: application/json" -d '{"subject": "Where is my order #1001?", "message": "Hi, where is my order #1001?"}'
+# "That is not a generic tracking article — the desk looked up order
+#  ORD-1001 in the shop's own orders file and answered with its real
+#  status: Shipped, with the items and the delivery date. Try #9999
+#  and it says honestly that the order does not exist."
 ```
 
 If you have a real API key, run one ticket without `--mock` to show
@@ -239,9 +259,11 @@ instructions. This project shows three techniques:
 Already done (so don't list these as "next"): the API, the tests, the
 eval script, structured logging, central config, CI, and Docker — see
 §11. Also already done: the human-in-the-loop escalation (repeat
-unhappy customers and unanswerable tickets go to a human) and the
+unhappy customers and unanswerable tickets go to a human), the
 relevance threshold (a weak match no longer produces an answer from
-the wrong article).
+the wrong article), and the real order lookup (tickets about an order
+number are answered from the shop's own orders file, not a generic
+article).
 
 ## 10. Likely manager questions — with short answers
 
@@ -325,12 +347,15 @@ what this layer does:
   priority=high`. The CLI's THINK / ACT / OBSERVE prints are the
   human-readable demo; the log lines are the machine-readable record,
   and you can follow one ticket with `grep ticket_id=T-1001 app.log`.
-- **Tests (`tests/`, 21 tests, pytest).** Five areas: the retriever
+- **Tests (`tests/`, 33 tests, pytest).** Six areas: the retriever
   ranks the expected article first (and stays silent below the
   relevance threshold); the classifier returns valid JSON with the
   three fields and the right categories; the end-to-end pipeline
-  produces a reply that cites a real article; the API endpoints
-  answer, store, and 404 correctly; and the uniqueness behaviours —
+  produces a reply that cites a real article; the order lookup
+  extracts order ids, finds real orders, and honestly reports missing
+  ones; the API endpoints answer, store, and 404 correctly, and
+  identify customers from email or name (or treat a ticket as
+  anonymous); and the uniqueness behaviours —
   the desk says "I don't know" and escalates off-topic tickets,
   acknowledges repeat customers, and escalates repeat unhappy ones.
   A `conftest.py` fixture points memory and results at a temp folder,
@@ -338,12 +363,14 @@ what this layer does:
   `python -m pytest -q` (use the project's `venv` Python).
 - **Eval (`eval.py`).** Runs all 9 tickets in mock mode and prints a
   table: expected vs predicted category, top-1 article, hit or miss,
-  and whether the ticket was escalated — then the three headline
+  and whether the ticket was escalated — then the four headline
   numbers (classification accuracy 9/9, retrieval top-1 hit rate 9/9,
-  honesty 1/1 in mock mode). Each ticket carries its own `"expected"`
-  label in `data/tickets.json`, so the measurement is data-driven. If
-  you change the classifier or the retriever, run the eval and watch
-  the numbers move — that is the honest way to show an improvement.
+  honesty 1/1 in mock mode, plus order lookup 2/2 from two extra
+  probes: one order that exists, one that does not). Each ticket
+  carries its own `"expected"` label in `data/tickets.json`, so the
+  measurement is data-driven. If you change the classifier or the
+  retriever, run the eval and watch the numbers move — that is the
+  honest way to show an improvement.
 - **CI (`.github/workflows/ci.yml`).** On every push, GitHub Actions
   installs the dependencies, runs pytest, and runs the demo. It uses
   mock mode, so CI needs no API key and no secrets.
@@ -356,11 +383,12 @@ what this layer does:
 How to explain this layer to your manager, in one breath:
 
 > "The agents are the core, but I also made it a real service: an API
-> so other systems can send tickets, 21 automated tests, an eval script
+> so other systems can send tickets, 33 automated tests, an eval script
 > that scores the pipeline 9 out of 9 on classification and retrieval
-> plus 1 out of 1 on honesty, CI that checks every push, and a Docker
-> image so it runs the same everywhere. The eval numbers are in mock
-> mode — the next step is running the same eval against the real model."
+> plus 1 out of 1 on honesty and 2 out of 2 on order lookup, CI that
+> checks every push, and a Docker image so it runs the same everywhere.
+> The eval numbers are in mock mode — the next step is running the same
+> eval against the real model."
 
 **11. Why have both a CLI and an API?**
 The CLI is the demo and the debugging tool — you see every step. The
@@ -368,10 +396,11 @@ API is how a real product would use the desk: another system sends a
 ticket and gets structured JSON back. Same pipeline, two doors in.
 
 **12. How do you know it works — really?**
-Three ways: the tests (19 passing) pin the behaviour, the eval
-measures it (9/9 classification, 9/9 retrieval, honesty 1/1 in mock
-mode), and CI re-runs both on every push. If a change breaks
-something, one of the three catches it before a human has to.
+Three ways: the tests (33 passing) pin the behaviour, the eval
+measures it (9/9 classification, 9/9 retrieval, honesty 1/1, order
+lookup 2/2 in mock mode), and CI re-runs both on every push. If a
+change breaks something, one of the three catches it before a human
+has to.
 
 **13. What does "mock mode" mean for these numbers?**
 The eval and the tests run against the rule-based mock LLM, not a real
@@ -381,14 +410,16 @@ next step is running the same eval with a real API key and reporting
 that number too.
 
 **14. What makes this project different from other support-bot demos?**
-Three things, all measured: it refuses to answer when it has no
+Four things, all measured: it refuses to answer when it has no
 answer (the relevance threshold + "I don't know" + escalation,
 measured by the honesty score); it uses the customer's history
 instead of just storing it (the reply acknowledges repeat customers,
-and repeat unhappy customers are escalated); and everything is
-proven with numbers (21 tests, 9/9 + 9/9 + 1/1 eval, CI on every
-push). Most demos only show the happy path — this one is built
-around the hard cases.
+and repeat unhappy customers are escalated); it answers "where is my
+order?" from a real orders file instead of a generic article (and
+honestly says when the order does not exist, measured by the order
+lookup score); and everything is proven with numbers (33 tests, 9/9 +
+9/9 + 1/1 + 2/2 eval, CI on every push). Most demos only show the
+happy path — this one is built around the hard cases.
 
 **15. How did you pick the relevance threshold of 10.0?**
 By measuring, not guessing. I scored all 8 real tickets (15.49–
@@ -400,8 +431,41 @@ re-measured if the knowledge base changes.
 
 **16. Exactly when does a ticket go to a human?**
 Two rules, both visible in the result as `needs_human_review` with
-a reason: (1) no help article scores above the relevance threshold —
-the desk said "I don't know"; (2) the customer is unhappy
-(negative sentiment) about an urgent problem (high priority) and
-has already written twice before. Everything else gets a draft
-reply the human can send as-is.
+a reason: (1) no help article scores above the relevance threshold
+AND the order lookup did not answer the ticket either — the desk said
+"I don't know"; (2) the customer is unhappy (negative sentiment)
+about an urgent problem (high priority) and has already written twice
+before. Everything else gets a draft reply the human can send as-is.
+Note the first rule carefully: a ticket about a real order that the
+lookup found is answered, so it is not escalated — flagging it as "no
+article answers this" would be a reason that is not true.
+
+**17. How does the order lookup work?**
+The orchestrator extracts an order number from the ticket text with a
+small regex — it matches `ORD-1001` and `#1001`, never a bare number
+("I have 2 orders" is not an order id) — then looks it up in
+`data/orders.json`, a file of 8 real orders with items, totals, live
+statuses, carriers, and tracking numbers. The order (or the fact that
+it does not exist) goes into the responder's prompt as an ORDER
+DETAILS block, so the reply states the order's real status, items,
+and delivery date. The result also carries the order as `"order"` and
+the mentioned id as `"order_id_mentioned"`, so the homepage can show
+an "Order found" panel.
+
+**18. What happens when the order number doesn't exist?**
+The lookup returns nothing, the prompt says so plainly, and the reply
+says "I couldn't find order ORD-9999" and asks the customer to check
+the number. It never invents a status, tracking number, or delivery
+date — and the ticket is escalated to a human, because no article and
+no order answered it. The eval measures this: the order-lookup score
+is 2/2 (one found, one not found).
+
+**19. How does the site know who I am now?**
+The web form has optional Name and Email fields. An email (lowercased)
+becomes the customer id, so the same person writing twice is
+recognised as a repeat customer; a name alone becomes a `C-first-last`
+id. With neither, the ticket is anonymous: no history is recorded and
+the reply never claims a repeat visit that did not happen. Before
+this fix every form ticket shared one default customer id, so a
+first-time stranger's reply wrongly said "you've written to us 1
+time(s) before".

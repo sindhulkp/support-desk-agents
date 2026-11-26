@@ -7,7 +7,7 @@ and one drafts a grounded reply. The project also keeps per-customer
 memory in a JSON file.
 
 It is now a **real, runnable service**, not just a demo script: a FastAPI
-API, 21 automated tests, an eval script that scores the pipeline on all
+API, 33 automated tests, an eval script that scores the pipeline on all
 9 sample tickets, CI on every push, and a Dockerfile.
 
 Built for a beginner learning agentic AI and prompt engineering. Every
@@ -38,7 +38,10 @@ Ticket arrives
 **Key ideas demonstrated:** multi-agent orchestration, the agent loop
 (THINK → ACT → OBSERVE), RAG (retrieval-augmented generation), structured
 JSON output, grounded generation with citations, per-customer memory,
-structured logging, and a tested HTTP API.
+structured logging, a tested HTTP API — and a **real order lookup**: when
+a ticket mentions an order number (`ORD-1001` or `#1001`), the desk looks
+it up in `data/orders.json` and answers from the order's real status,
+items, and delivery date, or honestly says the order could not be found.
 
 ## What makes this different from other support-bot projects
 
@@ -58,9 +61,16 @@ that matter more — and each one is measured, not just claimed:
   reply acknowledges a returning customer, and the escalation rule
   reads their history. A repeat complaint is treated differently
   from a first contact.
-- **It is measured three ways.** 21 tests, an eval (9/9
-  classification, 9/9 retrieval, honesty 1/1 in mock mode), and CI
-  on every push — so "it works" is a number, not a feeling.
+- **It looks up real orders by number.** A ticket asking "Where is my
+  order #1001?" gets that order's real status, items, and delivery
+  date from `data/orders.json` — not a generic tracking article. A
+  number that does not exist (`#9999`) gets an honest "I couldn't
+  find that order", never an invented status. Ticket T-1003 names its
+  real order, ORD-1003, which is Delayed — and the reply says so.
+- **It is measured three ways.** 33 tests, an eval (9/9
+  classification, 9/9 retrieval, honesty 1/1, order lookup 2/2 in
+  mock mode), and CI on every push — so "it works" is a number, not a
+  feeling.
 
 ## Setup
 
@@ -105,9 +115,15 @@ python -c "import json; [print(t['id'], '-', t['subject']) for t in json.load(op
 ```
 
 Sample tickets: `T-1001` double charge, `T-1002` password reset,
-`T-1003` stuck tracking, `T-1004` damaged headphones, `T-1005` refund
+`T-1003` stuck tracking (names its real order, ORD-1003, which is
+Delayed), `T-1004` damaged headphones, `T-1005` refund
 status, `T-1006` app crash, `T-1007` address change, `T-1008` late return,
 `T-1009` Bitcoin question (no article covers it — the "I don't know" case).
+
+Real orders live in `data/orders.json` (8 orders, ORD-1001 to ORD-1008).
+Ask about one by number — `Where is my order #1001?` — and the desk
+answers from that order's real status. `#9999` does not exist, and the
+desk says so honestly instead of inventing a status.
 
 ## Run it (API)
 
@@ -130,9 +146,23 @@ curl -X POST http://127.0.0.1:8000/tickets \
 # Process a ticket sent inline
 curl -X POST http://127.0.0.1:8000/tickets \
   -H "Content-Type: application/json" \
-  -d '{"id": "WEB-1", "customer_id": "C-200", "customer_name": "Sam",
+  -d '{"id": "WEB-1", "customer_name": "Sam", "customer_email": "sam@example.com",
        "subject": "Where is my refund?",
        "message": "I returned my order two weeks ago and still have no refund."}'
+
+# Ask about a real order by number — the reply states its real status
+curl -X POST http://127.0.0.1:8000/tickets \
+  -H "Content-Type: application/json" \
+  -d '{"subject": "Where is my order #1001?",
+       "message": "Hi, where is my order #1001? I placed it last week."}'
+# ... "order": {"order_id": "ORD-1001", "status": "Shipped", ...}
+
+# An order number that does not exist is reported honestly
+curl -X POST http://127.0.0.1:8000/tickets \
+  -H "Content-Type: application/json" \
+  -d '{"subject": "Where is my order #9999?",
+       "message": "Hi, where is my order #9999?"}'
+# ... "order": null, "order_id_mentioned": "ORD-9999", reply: "I couldn't find..."
 
 # Fetch the stored result of a processed ticket
 curl http://127.0.0.1:8000/tickets/T-1001
@@ -150,15 +180,17 @@ operations dashboard — it talks to the same API, no extra setup.
 ## Tests and eval
 
 ```bash
-# 21 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
-# plus the behaviours that make this desk different (honesty, memory, escalation)
+# 33 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
+# order lookup, customer identity — plus the behaviours that make this
+# desk different (honesty, memory, escalation)
 python -m pytest -q
 
-# Eval: run all 9 tickets in mock mode and score them
+# Eval: run all 9 tickets in mock mode and score them, plus 2 order probes
 python eval.py
 # Classification accuracy : 9/9 (100%)
 # Retrieval top-1 hit rate: 9/9 (100%)
 # Honesty (says I don't know + escalates): 1/1
+# Order lookup: 2/2
 ```
 
 Each ticket in `data/tickets.json` carries an `"expected"` label
@@ -202,7 +234,8 @@ things that change.
 |---|---|---|---|---|
 | Classifier | `agents/classifier.py` | ticket text | `{category, priority, sentiment}` | LLM + JSON mode |
 | Retriever | `agents/retriever.py` | ticket text | top 3 help articles + scores | BM25 (pure Python) |
-| Responder | `agents/responder.py` | ticket + articles | draft reply with citations | LLM, grounded-only prompt |
+| Order lookup | `agents/order_lookup.py` | order id from the ticket | the real order, or `None` | regex + JSON file lookup |
+| Responder | `agents/responder.py` | ticket + articles + order | draft reply with citations | LLM, grounded-only prompt |
 | Orchestrator | `agents/orchestrator.py` | ticket | full result + saved memory | runs 1→2→3 in sequence |
 
 ## Project layout
@@ -210,8 +243,8 @@ things that change.
 ```
 support-desk-agents/
 ├── main.py                 # CLI entry point (--demo / --ticket)
-├── api.py                  # FastAPI service: /health, POST /tickets, GET /tickets/{id}
-├── eval.py                 # scores the pipeline on all 9 tickets (mock mode)
+├── api.py                  # FastAPI service: /health, POST /tickets, GET /tickets/{id}, GET /stats
+├── eval.py                 # scores the pipeline on all 9 tickets + 2 order probes (mock mode)
 ├── config.py               # central settings from env vars + logging setup
 ├── llm.py                  # LLM wrapper + mock LLM (the only API code)
 ├── tools.py                # loads tickets, knowledge base, .env
@@ -219,18 +252,21 @@ support-desk-agents/
 │   ├── __init__.py
 │   ├── classifier.py       # agent 1: category / priority / sentiment
 │   ├── retriever.py        # agent 2: pure-Python BM25 search
-│   ├── responder.py        # agent 3: grounded draft reply
-│   └── orchestrator.py     # runs the 3 agents + per-customer memory + logging
-├── tests/                  # pytest: retriever, classifier, orchestrator, API
+│   ├── order_lookup.py     # tool: extract an order id, look it up in orders.json
+│   ├── responder.py        # agent 3: grounded draft reply (articles + order)
+│   └── orchestrator.py     # runs the 3 agents + order lookup + per-customer memory + logging
+├── tests/                  # pytest: retriever, classifier, orchestrator, API, orders
 │   ├── conftest.py         # temp memory/results files so tests stay clean
 │   ├── test_retriever.py
 │   ├── test_classifier.py
 │   ├── test_orchestrator.py
+│   ├── test_orders.py
 │   └── test_api.py
 ├── .github/workflows/ci.yml  # CI: pytest + demo on every push
 ├── Dockerfile              # container for the API (python:3.12-slim)
 ├── data/
-│   └── tickets.json        # 9 sample tickets, each with an "expected" label
+│   ├── tickets.json        # 9 sample tickets, each with an "expected" label
+│   └── orders.json         # 8 real orders (ORD-1001–ORD-1008) with live statuses
 ├── knowledge/              # 7 help articles (the RAG knowledge base)
 │   ├── refund-policy.md
 │   ├── password-reset.md
@@ -255,6 +291,13 @@ support-desk-agents/
 - **New ticket:** add an entry to `data/tickets.json` with `id`,
   `customer_id`, `customer_name`, `subject`, `message`, and an
   `"expected"` label (`category` + `articles`) so the eval can score it.
+- **New order:** add an entry to `data/orders.json` with `order_id`
+  (form `ORD-1009`), `customer_id`, `customer_name`, `email`, `items`
+  (name, qty, price), `total`, `status` (Processing, Shipped, Out for
+  delivery, Delivered, or Delayed), `order_date`, `estimated_delivery`,
+  `carrier`, `tracking_number`, and `city`. The lookup picks it up
+  with no code changes — ask about it by number and the desk answers
+  from its real status.
 
 ## Notes and limits
 
@@ -268,6 +311,14 @@ support-desk-agents/
   step is embedding-based (vector) retrieval. The relevance threshold
   (10.0) softens this: a weak keyword coincidence no longer produces
   an answer from the wrong article, it produces "I don't know".
+  Short, heavily paraphrased questions can score below 10.0 even when
+  answerable — the safe failure is "I don't know" + escalation, never
+  a wrong answer. Note: a ticket about a real order is answered by the
+  order lookup even when no article scores above the threshold.
+- The order lookup matches an exact order number (`ORD-1001` or
+  `#1001`). A bare number ("I have 2 orders") is deliberately not
+  treated as an order id, and the orders "database" is a JSON file —
+  fine for a demo; a production service would use a real database.
 - The API has no auth and the "database" is a local JSON file
   (`results.json` / `memory.json`). Fine for a demo; a production
   service would add auth and a real database.

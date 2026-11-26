@@ -6,6 +6,12 @@ Job: take one ticket and run the three agents in order:
   2. Retriever   — which help articles answer it?
   3. Responder   — draft a grounded reply.
 
+Between steps 2 and 3 it also looks up any order number mentioned in
+the ticket — a real tool call against data/orders.json — so the reply
+can state the order's REAL status, items, and delivery date instead of
+quoting a generic article. When the number does not exist, the reply
+says the order could not be found; it never invents a status.
+
 This is the agent LOOP made visible: for every step we print
 THINK (what the agent is deciding), ACT (what tool or call it makes)
 and OBSERVE (what came back). In a bigger system the orchestrator could
@@ -34,6 +40,7 @@ import logging
 import os
 
 from .classifier import classify
+from .order_lookup import extract_order_id, find_order
 from .responder import draft_reply
 from .retriever import BM25Retriever
 
@@ -80,8 +87,8 @@ class SupportDesk:
         """
         if not quiet:
             print(f"\n{'=' * 60}")
-            print(f"Ticket {ticket['id']} — {ticket['customer_name']} "
-                  f"({ticket['customer_id']})")
+            print(f"Ticket {ticket['id']} — {ticket.get('customer_name', 'Guest')} "
+                  f"({ticket.get('customer_id') or 'anonymous'})")
             print(f"Subject: {ticket['subject']}")
             print(f"Message: {ticket['message']}")
             print(f"{'=' * 60}")
@@ -123,18 +130,50 @@ class SupportDesk:
                 f"top 3 articles: {found}",
             )
 
+        # -- Order lookup: a real tool call, not a guess ---------------------
+        # If the ticket mentions an order number ("ORD-1001" or "#1001"),
+        # look it up in the shop's orders file. The reply can then state
+        # the order's REAL status, items, and delivery date. When the
+        # number does not exist, order is None and the responder must
+        # say so honestly instead of inventing a status.
+        order_id_mentioned = extract_order_id(
+            f"{ticket['subject']} {ticket['message']}"
+        )
+        order = (
+            find_order(order_id_mentioned) if order_id_mentioned else None
+        )
+        logger.info(
+            "step=order_lookup ticket_id=%s order_id=%s found=%s",
+            ticket["id"], order_id_mentioned, order is not None,
+        )
+        if verbose and not quiet:
+            if order_id_mentioned:
+                found = (
+                    f"found: {order['status']}, "
+                    f"estimated delivery {order['estimated_delivery']}"
+                    if order else "no such order in the system"
+                )
+                print(f"[order] Order {order_id_mentioned} mentioned — {found}.")
+            else:
+                print("[order] No order number mentioned — lookup skipped.")
+
         # -- Memory: read this customer's history BEFORE replying ---------
         # Most support bots save memory and never use it. Here the reply
         # is written knowing the customer's history: a repeat customer
         # gets acknowledged, and a repeat angry customer gets escalated
         # to a human instead of another auto-reply.
+        # A ticket with no customer identity (customer_id None — a
+        # stranger who left the name/email fields blank on the web
+        # form) has no history and saves none: every such ticket is a
+        # first contact, never a false "repeat customer".
         memory = load_memory()
-        history = memory.get(ticket["customer_id"], [])
+        customer_id = ticket.get("customer_id")
+        history = memory.get(customer_id, []) if customer_id else []
         prior_tickets = len(history)
         prior_categories = [h["category"] for h in history]
         logger.info(
             "step=memory ticket_id=%s customer_id=%s prior_tickets=%d",
-            ticket["id"], ticket["customer_id"], prior_tickets,
+            ticket["id"], customer_id, prior_tickets,
         )
 
         # -- Step 3: respond -------------------------------------------------
@@ -142,6 +181,8 @@ class SupportDesk:
             self.llm, ticket, retrieved,
             prior_tickets=prior_tickets,
             prior_categories=prior_categories,
+            order=order,
+            order_id_mentioned=order_id_mentioned,
         )
         logger.info(
             "step=respond ticket_id=%s reply_chars=%d",
@@ -156,17 +197,22 @@ class SupportDesk:
             )
 
         if not quiet:
-            print(f"\n>>> DRAFT REPLY (to {ticket['customer_name']}):\n{reply}\n")
+            print(f"\n>>> DRAFT REPLY (to {ticket.get('customer_name', 'Guest')}):\n{reply}\n")
 
         # -- Escalation: know when NOT to auto-reply -------------------------
         # A bot that answers everything is not helpful — it is risky.
         # This ticket goes to a human when:
-        #   * no help article answers it (the honest "I don't know" case), or
+        #   * no help article answers it AND the order lookup did not
+        #     answer it either (the honest "I don't know" case), or
         #   * an unhappy customer with an urgent problem has already
         #     written twice before (a repeat complaint needs a person).
+        # An order the lookup found counts as answered: the reply
+        # stated the order's real status, so the empty-retrieval rule
+        # must not fire — otherwise a correctly answered order ticket
+        # would be flagged with a reason that is not true.
         needs_human_review = False
         escalation_reason = None
-        if not retrieved:
+        if not retrieved and order is None:
             needs_human_review = True
             escalation_reason = (
                 "No help article answers this ticket — the desk said "
@@ -188,7 +234,7 @@ class SupportDesk:
         )
         if verbose and not quiet:
             if prior_tickets > 0:
-                print(f"[memory] Customer {ticket['customer_id']} has "
+                print(f"[memory] Customer {customer_id} has "
                       f"{prior_tickets} prior ticket(s) on file "
                       f"({', '.join(prior_categories)}).")
             if needs_human_review:
@@ -197,22 +243,31 @@ class SupportDesk:
                 print("[escalation] No escalation — safe to send the draft reply.")
 
         # -- Memory: record this ticket for next time ------------------------
-        history.append(
-            {
-                "ticket_id": ticket["id"],
-                "category": classification["category"],
-                "priority": classification["priority"],
-            }
-        )
-        memory[ticket["customer_id"]] = history
-        save_memory(memory)
-        logger.info(
-            "step=memory ticket_id=%s customer_id=%s total_tickets=%d",
-            ticket["id"], ticket["customer_id"], len(history),
-        )
-        if verbose and not quiet:
-            print(f"[memory] Saved to memory.json — customer "
-                  f"{ticket['customer_id']} now has {len(history)} ticket(s) on file.")
+        # Only when the ticket carries a customer identity. An anonymous
+        # web-form ticket (customer_id None) is never recorded, so two
+        # strangers can never be mistaken for one repeat customer.
+        if customer_id:
+            history.append(
+                {
+                    "ticket_id": ticket["id"],
+                    "category": classification["category"],
+                    "priority": classification["priority"],
+                }
+            )
+            memory[customer_id] = history
+            save_memory(memory)
+            logger.info(
+                "step=memory ticket_id=%s customer_id=%s total_tickets=%d",
+                ticket["id"], customer_id, len(history),
+            )
+            if verbose and not quiet:
+                print(f"[memory] Saved to memory.json — customer "
+                      f"{customer_id} now has {len(history)} ticket(s) on file.")
+        else:
+            logger.info(
+                "step=memory ticket_id=%s customer_id=None skipped (anonymous)",
+                ticket["id"],
+            )
 
         return {
             "ticket": ticket,
@@ -223,6 +278,8 @@ class SupportDesk:
             ],
             "reply": reply,
             "prior_tickets": prior_tickets,
+            "order": order,
+            "order_id_mentioned": order_id_mentioned,
             "needs_human_review": needs_human_review,
             "escalation_reason": escalation_reason,
         }

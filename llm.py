@@ -111,7 +111,7 @@ class MockLLM:
             category = "billing"
         elif any(w in ticket for w in ["login", "password", "crash", "app", "error", "reset"]):
             category = "technical"
-        elif any(w in ticket for w in ["delivery", "tracking", "shipped", "package", "address", "arrive"]):
+        elif any(w in ticket for w in ["delivery", "tracking", "shipped", "package", "address", "arrive", "order"]):
             category = "shipping"
         elif any(w in ticket for w in ["return", "exchange", "replacement"]):
             category = "returns"
@@ -154,8 +154,61 @@ class MockLLM:
                 "thank you for your patience while we sort this out.\n\n"
             )
 
+        # The order lookup ran before the responder: if the customer
+        # mentioned an order number that does not exist, say so
+        # honestly — never invent a status for it. This check comes
+        # first, even when help articles were also found: the order
+        # question is what the customer actually asked.
+        not_found = re.search(
+            r"ORDER LOOKUP:.*?mentioned order (ORD-\d+), but no order",
+            user_prompt, flags=re.DOTALL,
+        )
+        if not_found:
+            return (
+                ack
+                + f"Hi, thanks for reaching out. I checked our order system "
+                f"and I couldn't find order {not_found.group(1)} — please "
+                f"double-check the order number (it should look like "
+                f"ORD-1001) and write back. If the number is right, I can "
+                f"pass this to a human support agent who will look into it."
+            )
+
+        # If the order lookup found a real order, state its real status,
+        # items, and estimated delivery from the ORDER DETAILS block —
+        # those are facts from the shop's own system, not a guess.
+        # Articles below, if any, are cited as well.
+        order_block = re.search(
+            r"ORDER DETAILS:\n(.*?)(?=\n\nCUSTOMER HISTORY|\Z)",
+            user_prompt, flags=re.DOTALL,
+        )
+        order_lines = []
+        if order_block:
+            block = order_block.group(1)
+            status = re.search(r"status: (.+)", block)
+            items = re.search(r"Items: (.+)", block)
+            total = re.search(r"Total: (.+)", block)
+            carrier = re.search(r"Carrier: (.+)", block)
+            eta = re.search(r"Estimated delivery: (.+)", block)
+            order_id = re.search(r"Order (ORD-\d+)", block)
+            order_lines = [
+                "Hi, thanks for getting in touch — here's the status of "
+                f"your order [Order {order_id.group(1) if order_id else '—'}]:\n",
+            ]
+            if status:
+                order_lines.append(f"Status: {status.group(1).strip()}")
+            if items:
+                order_lines.append(f"Items: {items.group(1).strip()}")
+            if total:
+                order_lines.append(f"Total: {total.group(1).strip()}")
+            if carrier:
+                order_lines.append(f"Carrier: {carrier.group(1).strip()}")
+            if eta:
+                order_lines.append(
+                    f"Estimated delivery: {eta.group(1).strip()}"
+                )
+
         # If the retriever found nothing, the honest answer is "I don't know".
-        if "NO RELEVANT ARTICLES FOUND" in user_prompt:
+        if "NO RELEVANT ARTICLES FOUND" in user_prompt and not order_lines:
             return (
                 ack
                 + "Hi, thanks for reaching out. I checked our help articles and "
@@ -167,16 +220,28 @@ class MockLLM:
         # Otherwise, pull each article (title + a short snippet of its text)
         # out of the prompt and cite it. This is the mock version of
         # "grounded generation": the reply quotes the retrieved facts.
+        # The article text stops at the ORDER DETAILS / ORDER LOOKUP /
+        # CUSTOMER HISTORY blocks, so order facts never leak into an
+        # article snippet.
         blocks = re.findall(
-            r"ARTICLE \d+: (.+?)\n(.*?)(?=ARTICLE \d+:|$)",
+            r"ARTICLE \d+: (.+?)\n(.*?)(?=ARTICLE \d+:|ORDER DETAILS:|ORDER LOOKUP:|CUSTOMER HISTORY:|$)",
             user_prompt,
             flags=re.DOTALL,
         )
 
-        lines = ["Hi, thanks for getting in touch — here's what I found in our help articles:\n"]
-        for i, (title, body) in enumerate(blocks, start=1):
-            snippet = self._first_meaningful_lines(body)
-            lines.append(f"[{i}] {title.strip()}: {snippet}")
+        lines = []
+        if order_lines:
+            lines.extend(order_lines)
+            lines.append("")
+        if blocks:
+            lines.append(
+                "Hi, thanks for getting in touch — here's what I found in our help articles:\n"
+                if not order_lines
+                else "And here's what our help articles say about tracking:\n"
+            )
+            for i, (title, body) in enumerate(blocks, start=1):
+                snippet = self._first_meaningful_lines(body)
+                lines.append(f"[{i}] {title.strip()}: {snippet}")
         lines.append(
             "\nIf those steps don't resolve it, please reply and let us know — "
             "we're happy to help further."
