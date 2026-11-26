@@ -31,6 +31,7 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from agents.orchestrator import SupportDesk
@@ -105,6 +106,14 @@ class TicketRequest(BaseModel):
 
 
 # -- endpoints ----------------------------------------------------------------
+@app.get("/", include_in_schema=False)
+def home():
+    """Serve the live demo page: pick a sample ticket (or write your own)
+    and run it through the real pipeline in the browser. Same origin as
+    the API, so the page needs no extra configuration or CORS."""
+    return FileResponse(os.path.join(BASE_DIR, "static", "index.html"))
+
+
 @app.get("/health")
 def health():
     """Liveness check + which LLM mode the service is running in."""

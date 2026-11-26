@@ -7,7 +7,7 @@ and one drafts a grounded reply. The project also keeps per-customer
 memory in a JSON file.
 
 It is now a **real, runnable service**, not just a demo script: a FastAPI
-API, 19 automated tests, an eval script that scores the pipeline on all
+API, 20 automated tests, an eval script that scores the pipeline on all
 9 sample tickets, CI on every push, and a Dockerfile.
 
 Built for a beginner learning agentic AI and prompt engineering. Every
@@ -46,8 +46,8 @@ Most demos answer every ticket. This one is built around the moments
 that matter more — and each one is measured, not just claimed:
 
 - **It says "I don't know" — and means it.** The retriever has a
-  relevance threshold (measured: real tickets score 14.67–33.66,
-  off-topic questions at most 8.41). Below it, no article is returned,
+  relevance threshold (measured: real tickets score 15.49–36.45,
+  off-topic questions at most 9.18). Below it, no article is returned,
   the responder refuses to guess, and the ticket is flagged for a
   human. Ticket T-1009 ("Do you accept Bitcoin?") proves it.
 - **It knows when to hand off to a human.** A ticket is escalated
@@ -58,7 +58,7 @@ that matter more — and each one is measured, not just claimed:
   reply acknowledges a returning customer, and the escalation rule
   reads their history. A repeat complaint is treated differently
   from a first contact.
-- **It is measured three ways.** 19 tests, an eval (9/9
+- **It is measured three ways.** 20 tests, an eval (9/9
   classification, 9/9 retrieval, honesty 1/1 in mock mode), and CI
   on every push — so "it works" is a number, not a feeling.
 
@@ -145,7 +145,7 @@ Interactive docs are at `http://127.0.0.1:8000/docs`.
 ## Tests and eval
 
 ```bash
-# 19 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
+# 20 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
 # plus the behaviours that make this desk different (honesty, memory, escalation)
 python -m pytest -q
 

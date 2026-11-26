@@ -16,4 +16,5 @@ COPY . .
 EXPOSE 8000
 
 # The API runs in mock mode unless LLM_API_KEY is passed with -e.
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# ${PORT:-8000}: hosts like Render assign the port at runtime.
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]

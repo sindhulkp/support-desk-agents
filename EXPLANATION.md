@@ -325,7 +325,7 @@ what this layer does:
   priority=high`. The CLI's THINK / ACT / OBSERVE prints are the
   human-readable demo; the log lines are the machine-readable record,
   and you can follow one ticket with `grep ticket_id=T-1001 app.log`.
-- **Tests (`tests/`, 19 tests, pytest).** Five areas: the retriever
+- **Tests (`tests/`, 20 tests, pytest).** Five areas: the retriever
   ranks the expected article first (and stays silent below the
   relevance threshold); the classifier returns valid JSON with the
   three fields and the right categories; the end-to-end pipeline
@@ -356,7 +356,7 @@ what this layer does:
 How to explain this layer to your manager, in one breath:
 
 > "The agents are the core, but I also made it a real service: an API
-> so other systems can send tickets, 19 automated tests, an eval script
+> so other systems can send tickets, 20 automated tests, an eval script
 > that scores the pipeline 9 out of 9 on classification and retrieval
 > plus 1 out of 1 on honesty, CI that checks every push, and a Docker
 > image so it runs the same everywhere. The eval numbers are in mock
@@ -386,14 +386,14 @@ answer (the relevance threshold + "I don't know" + escalation,
 measured by the honesty score); it uses the customer's history
 instead of just storing it (the reply acknowledges repeat customers,
 and repeat unhappy customers are escalated); and everything is
-proven with numbers (19 tests, 9/9 + 9/9 + 1/1 eval, CI on every
+proven with numbers (20 tests, 9/9 + 9/9 + 1/1 eval, CI on every
 push). Most demos only show the happy path — this one is built
 around the hard cases.
 
 **15. How did you pick the relevance threshold of 10.0?**
-By measuring, not guessing. I scored all 8 real tickets (14.67–
-33.66) and several off-topic questions (at most 8.41 for the Bitcoin
-ticket, 2.43 for the short probe) and put the threshold between
+By measuring, not guessing. I scored all 8 real tickets (15.49–
+36.45) and several off-topic questions (at most 9.18 for the Bitcoin
+ticket, 2.40 for the short probes) and put the threshold between
 them. The number is written in `agents/retriever.py` with the
 measurements, so anyone can re-check it — and it must be
 re-measured if the knowledge base changes.

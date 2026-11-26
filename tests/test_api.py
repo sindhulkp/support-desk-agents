@@ -22,6 +22,16 @@ def test_health_returns_ok_and_mock_mode():
     assert body["tickets_processed"] == 0
 
 
+def test_homepage_serves_the_live_demo_page():
+    """GET / serves the demo frontend (the page anyone opens), not JSON."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Support Desk Agents" in response.text
+    assert "Run the agents" in response.text
+    # The page must not depend on any outside service or branding.
+    assert "muse.ai" not in response.text
+
+
 def test_post_sample_ticket_and_get_stored_result():
     post = client.post("/tickets", json={"ticket_id": "T-1002"})
     assert post.status_code == 201

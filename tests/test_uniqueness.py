@@ -78,6 +78,6 @@ def test_first_time_customer_with_normal_problem_is_not_escalated():
 
 def test_retriever_threshold_rejects_weak_matches():
     """Direct check on the search: the Bitcoin question's best score
-    (2.43) is below the 10.0 relevance threshold."""
+    is below the 10.0 relevance threshold."""
     retriever = BM25Retriever(knowledge_dir())
     assert retriever.search("Do you accept Bitcoin as payment?") == []

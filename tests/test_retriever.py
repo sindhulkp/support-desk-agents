@@ -60,7 +60,7 @@ def test_no_match_returns_empty_list():
 def test_weak_match_below_threshold_returns_empty_list():
     """A real question the knowledge base does not cover must also
     return [] — even though a word or two happens to match ("payment"
-    appears in Payment Failed), the best score (2.43) is below the
+    appears in Payment Failed), the best score is below the
     relevance threshold, so the desk admits it has no answer instead
     of replying from a barely-related article."""
     retriever = _retriever()

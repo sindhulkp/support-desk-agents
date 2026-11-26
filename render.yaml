@@ -1,0 +1,14 @@
+# Render Blueprint — deploys this repo as one free web service.
+# In Render: New + -> Blueprint -> connect this repo. Render reads this
+# file, builds the Dockerfile, and gives the service a public URL like
+# https://support-desk-agents.onrender.com
+# No API key is needed: the service runs in mock mode (MOCK_LLM=1).
+services:
+  - type: web
+    name: support-desk-agents
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MOCK_LLM
+        value: "1"

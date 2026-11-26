@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Desk Agents — live demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         margin: 0; color: #1f2937; background: #f8fafc; line-height: 1.55; }
+  header { background: #0f172a; color: #fff; padding: 28px 20px; }
+  header h1 { margin: 0 0 6px; font-size: 26px; }
+  header p { margin: 0; color: #cbd5e1; max-width: 720px; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px; }
+  section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; margin-bottom: 16px; }
+  h2 { margin-top: 0; font-size: 19px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .steps div { background: #f1f5f9; border-radius: 8px; padding: 12px; }
+  .steps b { display: block; margin-bottom: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .chips button { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
+                  padding: 7px 12px; cursor: pointer; font-size: 14px; }
+  .chips button:hover, .chips button.active { background: #0f172a; color: #fff;
+                  border-color: #0f172a; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; font-size: 14px; }
+  input[type=text], textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+                  padding: 10px; font: inherit; }
+  textarea { min-height: 90px; resize: vertical; }
+  .run { margin-top: 14px; background: #0f172a; color: #fff; border: 0; border-radius: 8px;
+         padding: 12px 20px; font-size: 16px; cursor: pointer; }
+  .run:disabled { opacity: .6; cursor: wait; }
+  .result { display: none; }
+  .result.show { display: block; }
+  .badge { display: inline-block; border-radius: 999px; padding: 3px 10px;
+           font-size: 13px; font-weight: 600; margin-right: 6px; }
+  .billing { background: #dbeafe; } .technical { background: #ede9fe; }
+  .shipping { background: #dcfce7; } .returns { background: #fef3c7; }
+  .general { background: #e2e8f0; }
+  .high { background: #fee2e2; } .normal { background: #e0e7ff; } .low { background: #f1f5f9; }
+  .negative { background: #fee2e2; } .neutral { background: #f1f5f9; } .positive { background: #dcfce7; }
+  .escalate { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;
+              padding: 12px; margin: 12px 0; font-weight: 600; }
+  .ok { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;
+        padding: 12px; margin: 12px 0; }
+  .reply { background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; white-space: pre-wrap; }
+  .muted { color: #64748b; font-size: 14px; }
+  footer { text-align: center; color: #64748b; font-size: 14px; padding: 8px 20px 28px; }
+  footer a { color: #0f172a; }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Support Desk Agents</h1>
+  <p>A multi-agent customer support desk. Three AI agents handle each ticket:
+     one classifies it, one finds the right help articles, one drafts a grounded reply —
+     and the desk knows when to hand a ticket to a human instead of guessing.</p>
+  <p class="muted" style="color:#94a3b8" id="status">Checking service…</p>
+</header>
+<main>
+  <section>
+    <h2>The problem</h2>
+    <p>When a customer writes in, someone has to read the message, decide what kind of
+       problem it is and how urgent, dig through help articles for the answer, and write
+       a reply. Done by hand that is slow and inconsistent — and the reply depends on
+       who happens to pick the ticket up.</p>
+    <div class="steps">
+      <div><b>1. Classifier</b>Reads the ticket and decides its type, urgency, and the customer’s mood.</div>
+      <div><b>2. Retriever</b>Searches the help articles and pulls the three most relevant ones. If nothing really matches, it says so.</div>
+      <div><b>3. Responder</b>Drafts a reply using only those articles, with citations — or says “I don’t know” and flags it for a human.</div>
+    </div>
+    <p class="muted">What makes it different: a measured relevance threshold (10.0) so weak matches never produce an answer; memory that is actually used — repeat customers are recognised and repeat unhappy ones are escalated; and everything is measured — 20 tests, eval 9/9 classification, 9/9 retrieval, 1/1 honesty.</p>
+  </section>
+
+  <section>
+    <h2>Try it live</h2>
+    <p class="muted">Pick a sample ticket, or write your own. This page talks to the real running service — no demo script.</p>
+    <div class="chips" id="samples"></div>
+    <label for="subject">Subject</label>
+    <input type="text" id="subject" placeholder="e.g. Charged twice for my subscription">
+    <label for="message">Message</label>
+    <textarea id="message" placeholder="Write the customer's message here…"></textarea>
+    <br>
+    <button class="run" id="runBtn" onclick="runPipeline()">Run the agents</button>
+    <p class="muted" id="hint"></p>
+  </section>
+
+  <section class="result" id="result">
+    <h2>Result</h2>
+    <div id="classification"></div>
+    <div id="escalation"></div>
+    <h3>Articles found</h3>
+    <ul id="articles"></ul>
+    <h3>Draft reply</h3>
+    <div class="reply" id="reply"></div>
+    <p class="muted" id="memory"></p>
+  </section>
+</main>
+<footer>
+  Built with Python + FastAPI · <a href="https://github.com/sindhulkp/support-desk-agents">Source on GitHub</a> · API docs at <a href="/docs">/docs</a>
+</footer>
+<script>
+const SAMPLES = [
+  { id: "T-1001", subject: "Charged twice for my subscription this month",
+    message: "Hi, I was charged twice for my monthly subscription on the same day. I can see two identical charges of $19.99 on my card statement. This is urgent, please refund the extra charge as soon as possible. I am very frustrated because this is the second time it has happened." },
+  { id: "T-1002", subject: "Cannot log in — password reset email never arrives",
+    message: "Hello, I forgot my password and requested a reset link three times, but I never receive the email. I checked spam and junk too. I cannot log in to my account at all. Can you help me reset my password?" },
+  { id: "T-1003", subject: "Order tracking stuck for 5 days",
+    message: "My order was shipped a week ago but the tracking page still says 'label created' and has not moved in 5 days. The delivery was supposed to arrive yesterday. Could you please check where my package is?" },
+  { id: "T-1004", subject: "Damaged item received — headphones arrived broken",
+    message: "I just received my headphones and one earcup is cracked. The box was also dented. I am really disappointed. I would like a replacement or a refund, please. I have photos of the damage if you need them." },
+  { id: "T-1005", subject: "Where is my refund? It has been 10 days",
+    message: "Hi again, I returned my order two weeks ago and the return was confirmed, but I still have not received my refund. It has been 10 days now. Can you tell me when the refund will reach my account? Thanks." },
+  { id: "T-1006", subject: "App crashes every time I try to check out",
+    message: "Every time I tap the checkout button the app crashes and closes. I have tried restarting my phone and reinstalling the app, but it still crashes. I cannot complete my purchase. Please fix this urgently." },
+  { id: "T-1007", subject: "Need to change my delivery address",
+    message: "Hello, I just placed an order but I typed the wrong delivery address. The order has not shipped yet. Is it possible to change the address to my new apartment before it ships? Please let me know what you need from me." },
+  { id: "T-1008", subject: "Can I return headphones after 30 days?",
+    message: "Hi, I bought headphones 45 days ago and I would like to return them because they do not fit comfortably. I know the return window is 30 days, but I was travelling. Is there any exception, or can I get store credit instead? Thanks for your help." },
+  { id: "T-1009", subject: "Do you accept Bitcoin as payment?",
+    message: "Hi, I'd like to pay for my order with Bitcoin. Do you accept cryptocurrency payments, and if so, how do I pay? Thanks!" }
+];
+
+let selectedId = null;
+const samplesEl = document.getElementById("samples");
+SAMPLES.forEach(s => {
+  const b = document.createElement("button");
+  b.textContent = s.id;
+  b.title = s.subject;
+  b.onclick = () => {
+    selectedId = s.id;
+    document.getElementById("subject").value = s.subject;
+    document.getElementById("message").value = s.message;
+    document.querySelectorAll("#samples button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById("hint").textContent = "";
+  };
+  samplesEl.appendChild(b);
+});
+
+fetch("/health").then(r => r.json()).then(h => {
+  document.getElementById("status").textContent =
+    "Service is up · mode: " + h.llm_mode + " · tickets processed: " + h.tickets_processed;
+}).catch(() => {
+  document.getElementById("status").textContent = "Service status unknown.";
+});
+
+async function runPipeline() {
+  const subject = document.getElementById("subject").value.trim();
+  const message = document.getElementById("message").value.trim();
+  if (!subject || !message) {
+    document.getElementById("hint").textContent = "Please pick a sample ticket or write a subject and a message first.";
+    return;
+  }
+  const btn = document.getElementById("runBtn");
+  btn.disabled = true; btn.textContent = "Agents are working…";
+  try {
+    const body = selectedId && document.getElementById("subject").value === SAMPLES.find(s => s.id === selectedId).subject
+      ? { ticket_id: selectedId }
+      : { subject, message };
+    const res = await fetch("/tickets", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("The service answered " + res.status);
+    const data = await res.json();
+    const c = data.classification;
+    document.getElementById("classification").innerHTML =
+      '<span class="badge ' + c.category + '">' + c.category + '</span>' +
+      '<span class="badge ' + c.priority + '">priority: ' + c.priority + '</span>' +
+      '<span class="badge ' + c.sentiment + '">sentiment: ' + c.sentiment + '</span>';
+    document.getElementById("escalation").innerHTML = data.needs_human_review
+      ? '<div class="escalate">Human review needed — ' + data.escalation_reason + '</div>'
+      : '<div class="ok">No escalation — safe to send the draft reply.</div>';
+    document.getElementById("articles").innerHTML = data.retrieved.length
+      ? data.retrieved.map(a => "<li><b>" + a.title + "</b> (score " + a.score + ")</li>").join("")
+      : "<li>No help article answers this ticket — that is why the reply says so honestly.</li>";
+    document.getElementById("reply").textContent = data.reply;
+    document.getElementById("memory").textContent = data.prior_tickets > 0
+      ? "This customer had " + data.prior_tickets + " prior ticket(s) on file — the reply was written knowing that."
+      : "First time this customer has written in.";
+    document.getElementById("result").classList.add("show");
+    document.getElementById("result").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    document.getElementById("hint").textContent = "Something went wrong: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Run the agents";
+  }
+}
+</script>
+</body>
+</html>

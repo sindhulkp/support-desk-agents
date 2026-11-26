@@ -35,14 +35,44 @@ def tokenize(text):
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
+def stem_word(word):
+    """Light stemming: strip a common suffix so word forms match.
+
+    "ordered" and "order", "arrived" and "arrival", "charges" and
+    "charge" should count as the same word — without this, a customer
+    who writes "my package never arrived" scores far below one who
+    writes "my package never arrives", even though they mean the same
+    thing. Applied to both the articles and the query, so both sides
+    always agree. Deliberately crude (no dictionary, no exceptions):
+    this is a demo search, not a linguistics project.
+    """
+    if len(word) > 4 and word.endswith("ing"):
+        return word[:-3]
+    if len(word) > 3 and word.endswith("ed"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("es"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
+
+
 # Relevance threshold: a top score below this means "no article really
 # answers this ticket", even if a word or two happens to match.
-# Measured on 2026-11-26: all 8 real sample tickets score 14.67–33.66,
-# while off-topic questions score at most 8.41 (the Bitcoin ticket's
-# "pay"/"order" words weakly match Payment Failed) and 2.43 for the
-# short probe. 10.0 sits cleanly between the two, so the desk says
-# "I don't know" instead of answering from a barely-related article.
-# Re-measure if the knowledge base changes.
+# Measured on 2026-11-26 (with stemming on): all 8 real sample
+# tickets score 15.49–36.45, while off-topic questions score at most
+# 9.18 (the Bitcoin ticket's "pay"/"order" words weakly match Payment
+# Failed) and 2.40 for the short probes. 10.0 sits cleanly between
+# the two, so the desk says "I don't know" instead of answering from
+# a barely-related article. Re-measure if the knowledge base changes.
+# Honest limit: a short, heavily paraphrased question can score below
+# 10.0 even when it is answerable ("my package never arrived" scores
+# 9.51) — then the desk says "I don't know" and escalates, which is
+# the safe failure, never a wrong answer. Fixing that properly needs
+# semantic (embedding) search, not a better threshold: no single
+# number separates short paraphrases from off-topic questions.
 MIN_SCORE = 10.0
 
 
@@ -80,7 +110,12 @@ class BM25Retriever:
             self.docs.append({"title": title, "path": path, "text": text})
 
         # Pre-compute term frequencies and document lengths once.
-        self.doc_tokens = [tokenize(doc["text"]) for doc in self.docs]
+        # Words are stemmed here (and in search) so "ordered" matches
+        # "order" — see stem_word. Stopwords are NOT stemmed: they are
+        # filtered from the query on their raw form, before stemming.
+        self.doc_tokens = [
+            [stem_word(w) for w in tokenize(doc["text"])] for doc in self.docs
+        ]
         self.doc_lengths = [len(tokens) for tokens in self.doc_tokens]
         self.avg_length = sum(self.doc_lengths) / max(len(self.doc_lengths), 1)
 
@@ -121,8 +156,10 @@ class BM25Retriever:
         (a weak, coincidental match). The responder then knows to say
         "I don't know" instead of guessing from the wrong article.
         """
-        # Drop stopwords so the ranking reflects topic words, not "the"/"I".
-        query_words = [w for w in tokenize(query) if w not in STOPWORDS]
+        # Drop stopwords so the ranking reflects topic words, not "the"/"I",
+        # then stem so word forms match ("ordered" -> "order").
+        query_words = [stem_word(w) for w in tokenize(query)
+                       if w not in STOPWORDS]
         scored = [
             (doc, self._score(query_words, i)) for i, doc in enumerate(self.docs)
         ]
