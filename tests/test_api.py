@@ -60,6 +60,23 @@ def test_post_inline_ticket():
     assert post.json()["classification"]["category"] == "billing"
 
 
+def test_stats_counts_processed_tickets_and_escalations():
+    """GET /stats aggregates the stored results: totals, breakdowns,
+    escalations, honest 'I don't know' answers, and recent tickets."""
+    client.post("/tickets", json={"ticket_id": "T-1001"})
+    client.post("/tickets", json={"ticket_id": "T-1009"})
+
+    response = client.get("/stats")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tickets_processed"] == 2
+    assert body["by_category"]["billing"] == 2
+    assert body["escalated"] == 1
+    assert body["said_i_dont_know"] == 1
+    assert body["customers_seen"] == 2
+    assert [t["id"] for t in body["recent"]] == ["T-1009", "T-1001"]
+
+
 def test_unknown_ticket_ids_return_404():
     assert client.post("/tickets", json={"ticket_id": "T-9999"}).status_code == 404
     assert client.get("/tickets/T-9999").status_code == 404

@@ -169,3 +169,47 @@ def get_result(ticket_id: str):
             status_code=404, detail=f"no stored result for ticket {ticket_id}"
         )
     return result
+
+
+@app.get("/stats")
+def stats():
+    """Live operations numbers for the dashboard, computed from the
+    stored results: totals, breakdowns by category and priority, how
+    many tickets were escalated, how many got an honest "I don't
+    know", how many distinct customers have written in, and the most
+    recent tickets. Empty when nothing has been processed yet — the
+    dashboard fills up as tickets are run, it is never seeded with
+    fake numbers."""
+    _load_results()
+    by_category: dict[str, int] = {}
+    by_priority: dict[str, int] = {}
+    escalated = 0
+    dont_know = 0
+    customers = set()
+    recent = []
+    for ticket_id, result in _RESULTS.items():
+        cat = result["classification"]["category"]
+        by_category[cat] = by_category.get(cat, 0) + 1
+        pri = result["classification"]["priority"]
+        by_priority[pri] = by_priority.get(pri, 0) + 1
+        if result.get("needs_human_review"):
+            escalated += 1
+        if not result.get("retrieved"):
+            dont_know += 1
+        customers.add(result["ticket"]["customer_id"])
+        recent.append({
+            "id": ticket_id,
+            "subject": result["ticket"]["subject"],
+            "category": cat,
+            "priority": pri,
+            "escalated": bool(result.get("needs_human_review")),
+        })
+    return {
+        "tickets_processed": len(_RESULTS),
+        "by_category": by_category,
+        "by_priority": by_priority,
+        "escalated": escalated,
+        "said_i_dont_know": dont_know,
+        "customers_seen": len(customers),
+        "recent": recent[-8:][::-1],
+    }

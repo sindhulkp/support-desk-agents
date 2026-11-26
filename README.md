@@ -7,7 +7,7 @@ and one drafts a grounded reply. The project also keeps per-customer
 memory in a JSON file.
 
 It is now a **real, runnable service**, not just a demo script: a FastAPI
-API, 20 automated tests, an eval script that scores the pipeline on all
+API, 21 automated tests, an eval script that scores the pipeline on all
 9 sample tickets, CI on every push, and a Dockerfile.
 
 Built for a beginner learning agentic AI and prompt engineering. Every
@@ -58,7 +58,7 @@ that matter more — and each one is measured, not just claimed:
   reply acknowledges a returning customer, and the escalation rule
   reads their history. A repeat complaint is treated differently
   from a first contact.
-- **It is measured three ways.** 20 tests, an eval (9/9
+- **It is measured three ways.** 21 tests, an eval (9/9
   classification, 9/9 retrieval, honesty 1/1 in mock mode), and CI
   on every push — so "it works" is a number, not a feeling.
 
@@ -136,16 +136,21 @@ curl -X POST http://127.0.0.1:8000/tickets \
 
 # Fetch the stored result of a processed ticket
 curl http://127.0.0.1:8000/tickets/T-1001
+
+# Live operations numbers for the dashboard
+curl http://127.0.0.1:8000/stats
 ```
 
 Without an API key the API runs in mock mode (same fake LLM as
 `--demo`). With `LLM_API_KEY` in `.env` it uses the real LLM.
 Interactive docs are at `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:8000/` in a browser for the live demo page and
+operations dashboard — it talks to the same API, no extra setup.
 
 ## Tests and eval
 
 ```bash
-# 20 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
+# 21 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
 # plus the behaviours that make this desk different (honesty, memory, escalation)
 python -m pytest -q
 

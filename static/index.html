@@ -45,9 +45,15 @@
         padding: 12px; margin: 12px 0; }
   .reply { background: #f8fafc; border-left: 4px solid #0f172a; padding: 12px; white-space: pre-wrap; }
   .muted { color: #64748b; font-size: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stats div { background: #f1f5f9; border-radius: 8px; padding: 12px; text-align: center; }
+  .stats b { display: block; font-size: 26px; }
+  .stats span { font-size: 13px; color: #64748b; }
+  .bar { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+  .bar i { display: block; height: 14px; background: #0f172a; border-radius: 4px; }
   footer { text-align: center; color: #64748b; font-size: 14px; padding: 8px 20px 28px; }
   footer a { color: #0f172a; }
-  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -70,7 +76,7 @@
       <div><b>2. Retriever</b>Searches the help articles and pulls the three most relevant ones. If nothing really matches, it says so.</div>
       <div><b>3. Responder</b>Drafts a reply using only those articles, with citations — or says “I don’t know” and flags it for a human.</div>
     </div>
-    <p class="muted">What makes it different: a measured relevance threshold (10.0) so weak matches never produce an answer; memory that is actually used — repeat customers are recognised and repeat unhappy ones are escalated; and everything is measured — 20 tests, eval 9/9 classification, 9/9 retrieval, 1/1 honesty.</p>
+    <p class="muted">What makes it different: a measured relevance threshold (10.0) so weak matches never produce an answer; memory that is actually used — repeat customers are recognised and repeat unhappy ones are escalated; and everything is measured — 21 tests, eval 9/9 classification, 9/9 retrieval, 1/1 honesty.</p>
   </section>
 
   <section>
@@ -95,6 +101,23 @@
     <h3>Draft reply</h3>
     <div class="reply" id="reply"></div>
     <p class="muted" id="memory"></p>
+  </section>
+
+  <section>
+    <h2>Operations dashboard</h2>
+    <p class="muted">Live numbers from this service — nothing here is seeded. The dashboard fills up as tickets are run.</p>
+    <div class="stats" id="stats">
+      <div><b id="statProcessed">0</b><span>tickets processed</span></div>
+      <div><b id="statEscalated">0</b><span>escalated to a human</span></div>
+      <div><b id="statDontKnow">0</b><span>honest “I don’t know”</span></div>
+      <div><b id="statCustomers">0</b><span>customers seen</span></div>
+    </div>
+    <h3>By category</h3>
+    <div id="byCategory"><p class="muted">No tickets yet — run one above.</p></div>
+    <h3>Recent tickets</h3>
+    <ul id="recent"><li class="muted">No tickets yet.</li></ul>
+    <button class="run" id="runAllBtn" onclick="runAllSamples()">Run all 9 sample tickets</button>
+    <p class="muted" id="runAllHint"></p>
   </section>
 </main>
 <footer>
@@ -146,6 +169,49 @@ fetch("/health").then(r => r.json()).then(h => {
   document.getElementById("status").textContent = "Service status unknown.";
 });
 
+async function refreshStats() {
+  try {
+    const s = await (await fetch("/stats")).json();
+    document.getElementById("statProcessed").textContent = s.tickets_processed;
+    document.getElementById("statEscalated").textContent = s.escalated;
+    document.getElementById("statDontKnow").textContent = s.said_i_dont_know;
+    document.getElementById("statCustomers").textContent = s.customers_seen;
+    const cats = s.by_category;
+    const max = Math.max(1, ...Object.values(cats));
+    document.getElementById("byCategory").innerHTML = Object.keys(cats).length
+      ? Object.entries(cats).map(([c, n]) =>
+          '<div class="bar"><span style="width:90px">' + c + '</span><i style="width:' +
+          Math.round(100 * n / max) + '%"></i><span>' + n + '</span></div>').join("")
+      : '<p class="muted">No tickets yet — run one above.</p>';
+    document.getElementById("recent").innerHTML = s.recent.length
+      ? s.recent.map(t => "<li><b>" + t.id + "</b> — " + t.subject +
+          ' <span class="badge ' + t.category + '">' + t.category + "</span>" +
+          (t.escalated ? ' <span class="badge high">escalated</span>' : "") + "</li>").join("")
+      : '<li class="muted">No tickets yet.</li>';
+  } catch (e) { /* stats stay at zero if the service is unreachable */ }
+}
+refreshStats();
+
+async function runAllSamples() {
+  const btn = document.getElementById("runAllBtn");
+  btn.disabled = true; btn.textContent = "Running all 9 sample tickets…";
+  try {
+    for (const s of SAMPLES) {
+      await fetch("/tickets", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket_id: s.id })
+      });
+    }
+    document.getElementById("runAllHint").textContent =
+      "All 9 sample tickets processed — the dashboard above is now live with real results.";
+    refreshStats();
+  } catch (e) {
+    document.getElementById("runAllHint").textContent = "Something went wrong: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Run all 9 sample tickets";
+  }
+}
+
 async function runPipeline() {
   const subject = document.getElementById("subject").value.trim();
   const message = document.getElementById("message").value.trim();
@@ -182,6 +248,7 @@ async function runPipeline() {
       : "First time this customer has written in.";
     document.getElementById("result").classList.add("show");
     document.getElementById("result").scrollIntoView({ behavior: "smooth" });
+    refreshStats();
   } catch (e) {
     document.getElementById("hint").textContent = "Something went wrong: " + e.message;
   } finally {
