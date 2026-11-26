@@ -137,7 +137,7 @@ natural "next step" for this project (see §9).
 |---|---|---|
 | `main.py` | Command line: `--demo`, `--ticket T-1001`, `--mock` | The entry point; parses arguments and starts the desk |
 | `api.py` | FastAPI service: `GET /health`, `POST /tickets`, `GET /tickets/{id}` | The same pipeline, behind HTTP, so other programs can use it |
-| `eval.py` | Runs all 8 tickets in mock mode, prints accuracy + hit rate | Measurement: proves the pipeline works instead of claiming it |
+| `eval.py` | Runs all 9 tickets in mock mode, prints accuracy + hit rate + honesty | Measurement: proves the pipeline works instead of claiming it |
 | `config.py` | Central settings from env vars + `setup_logging()` | One place for config; values read on access, never hardcoded |
 | `llm.py` | `LLMClient` (real API) + `MockLLM` (fake, rule-based) | Only file that talks to an LLM; config comes from env vars only |
 | `tools.py` | Loads `tickets.json`, finds the knowledge folder, loads `.env` | Small helpers; "tools" are how agents touch the world |
@@ -148,7 +148,7 @@ natural "next step" for this project (see §9).
 | `tests/` | pytest: retriever, classifier, orchestrator, API | Tests pin the behaviour, so changes can't silently break it |
 | `.github/workflows/ci.yml` | CI: install, pytest, demo on every push | Automation: every push is checked, no key needed (mock mode) |
 | `Dockerfile` | Container for the API (`python:3.12-slim` + uvicorn) | Same code, same run, on any machine |
-| `data/tickets.json` | 8 sample tickets (billing, technical, shipping, returns) | Realistic input data — each ticket now has an `"expected"` label |
+| `data/tickets.json` | 9 sample tickets (billing, technical, shipping, returns) | Realistic input data — each ticket now has an `"expected"` label |
 | `knowledge/*.md` | 7 help articles (the RAG knowledge base) | Facts the responder is allowed to use |
 | `memory.json` | Created on first run | Per-customer ticket history |
 | `results.json` | Created by the API | Stored pipeline results, so `GET /tickets/{id}` can answer |
@@ -178,8 +178,12 @@ Say this, then run the commands:
 > articles — the model can't invent policy."
 
 ```bash
-# 1. Demo mode — no API key, fake LLM, three tickets (30 seconds)
+# 1. Demo mode — no API key, fake LLM, four tickets (40 seconds)
 python main.py --demo
+# Watch the fourth ticket, T-1009 ("Do you accept Bitcoin?"): no help
+#  article answers it, so the desk says "I don't know" and flags it
+#  for a human instead of guessing. Run the demo a second time and
+#  the replies open by recognising the returning customer.
 
 # 2. One ticket, point at the steps on screen (30 seconds)
 python main.py --ticket T-1004 --mock
@@ -189,7 +193,9 @@ python main.py --ticket T-1004 --mock
 # 3. Show the memory (15 seconds)
 cat memory.json
 # "The same customer coming back tomorrow is recognised — C-101
-#  already has two tickets on file."
+#  already has two tickets on file — and the reply says so. Run the
+#  same ticket a third time and the desk escalates it to a human:
+#  a repeat unhappy customer gets a person, not another auto-reply."
 
 # 4. Show how easy it is to extend (15 seconds)
 ls knowledge/
@@ -227,17 +233,15 @@ instructions. This project shows three techniques:
 
 - **Semantic search:** replace BM25 with embeddings so "money taken
   twice" matches "duplicate charge".
-- **A human-in-the-loop step:** high-priority or low-confidence
-  tickets go to a human for approval before the reply is sent.
-- **Confidence check:** if the top BM25 score is very low, skip the
-  responder and escalate automatically (today that happens only when
-  zero articles match).
 - **Auth and a real database:** the API has no auth and stores results
   in a JSON file — fine for a demo, but production needs both.
 
 Already done (so don't list these as "next"): the API, the tests, the
 eval script, structured logging, central config, CI, and Docker — see
-§11.
+§11. Also already done: the human-in-the-loop escalation (repeat
+unhappy customers and unanswerable tickets go to a human) and the
+relevance threshold (a weak match no longer produces an answer from
+the wrong article).
 
 ## 10. Likely manager questions — with short answers
 
@@ -261,12 +265,18 @@ query words appear, how rare those words are, and document length. Pure
 Python, no libraries, ~60 lines.
 
 **5. What happens when the knowledge base has no answer?**
-The retriever returns nothing, and the responder says it doesn't know
-and escalates to a human. It never guesses.
+The retriever has a relevance threshold (10.0, measured — see §12):
+if the best article scores below it, nothing is returned, the
+responder says it doesn't know, and the ticket is flagged for a
+human. It never guesses, and it never answers from a barely-related
+article. Ticket T-1009 proves it.
 
 **6. How does it remember customers?**
 After each ticket, the customer ID and ticket category are appended to
-`memory.json`. Returning customers are recognised by ID.
+`memory.json`. Returning customers are recognised by ID — and the
+memory is actually used: the reply acknowledges a repeat customer,
+and a repeat unhappy customer with an urgent problem is escalated to
+a human instead of getting another auto-reply.
 
 **7. What does the mock LLM do?**
 Rule-based fake used in demo mode — keyword matching for classification
@@ -281,8 +291,9 @@ model to `gemini-2.0-flash`. No code changes.
 
 **9. What are the limitations?**
 Keyword search misses paraphrases; the mock LLM's answers are simple;
-memory is a local JSON file, not a database; the API has no auth; there
-is no human approval step before a reply is sent.
+memory is a local JSON file, not a database; the API has no auth; the
+escalation rules are fixed (high + negative + 2 prior tickets), not
+learned from data.
 
 **10. How would you put this in production?**
 Add a human approval queue for high-priority tickets, swap BM25 for
@@ -314,21 +325,25 @@ what this layer does:
   priority=high`. The CLI's THINK / ACT / OBSERVE prints are the
   human-readable demo; the log lines are the machine-readable record,
   and you can follow one ticket with `grep ticket_id=T-1001 app.log`.
-- **Tests (`tests/`, 13 tests, pytest).** Four areas: the retriever
-  ranks the expected article first; the classifier returns valid JSON
-  with the three fields and the right categories; the end-to-end
-  pipeline produces a reply that cites a real article; the API
-  endpoints answer, store, and 404 correctly. A `conftest.py` fixture
-  points memory and results at a temp folder, so tests never touch
-  your real data. Run them with `python -m pytest -q`.
-- **Eval (`eval.py`).** Runs all 8 tickets in mock mode and prints a
-  table: expected vs predicted category, top-1 article, hit or miss —
-  then the two headline numbers (classification accuracy 8/8, retrieval
-  top-1 hit rate 8/8 in mock mode). Each ticket carries its own
-  `"expected"` label in `data/tickets.json`, so the measurement is
-  data-driven. If you change the classifier or the retriever, run the
-  eval and watch the numbers move — that is the honest way to show an
-  improvement.
+- **Tests (`tests/`, 19 tests, pytest).** Five areas: the retriever
+  ranks the expected article first (and stays silent below the
+  relevance threshold); the classifier returns valid JSON with the
+  three fields and the right categories; the end-to-end pipeline
+  produces a reply that cites a real article; the API endpoints
+  answer, store, and 404 correctly; and the uniqueness behaviours —
+  the desk says "I don't know" and escalates off-topic tickets,
+  acknowledges repeat customers, and escalates repeat unhappy ones.
+  A `conftest.py` fixture points memory and results at a temp folder,
+  so tests never touch your real data. Run them with
+  `python -m pytest -q` (use the project's `venv` Python).
+- **Eval (`eval.py`).** Runs all 9 tickets in mock mode and prints a
+  table: expected vs predicted category, top-1 article, hit or miss,
+  and whether the ticket was escalated — then the three headline
+  numbers (classification accuracy 9/9, retrieval top-1 hit rate 9/9,
+  honesty 1/1 in mock mode). Each ticket carries its own `"expected"`
+  label in `data/tickets.json`, so the measurement is data-driven. If
+  you change the classifier or the retriever, run the eval and watch
+  the numbers move — that is the honest way to show an improvement.
 - **CI (`.github/workflows/ci.yml`).** On every push, GitHub Actions
   installs the dependencies, runs pytest, and runs the demo. It uses
   mock mode, so CI needs no API key and no secrets.
@@ -341,11 +356,11 @@ what this layer does:
 How to explain this layer to your manager, in one breath:
 
 > "The agents are the core, but I also made it a real service: an API
-> so other systems can send tickets, 13 automated tests, an eval script
-> that scores the pipeline 8 out of 8 on classification and retrieval,
-> CI that checks every push, and a Docker image so it runs the same
-> everywhere. The eval numbers are in mock mode — the next step is
-> running the same eval against the real model."
+> so other systems can send tickets, 19 automated tests, an eval script
+> that scores the pipeline 9 out of 9 on classification and retrieval
+> plus 1 out of 1 on honesty, CI that checks every push, and a Docker
+> image so it runs the same everywhere. The eval numbers are in mock
+> mode — the next step is running the same eval against the real model."
 
 **11. Why have both a CLI and an API?**
 The CLI is the demo and the debugging tool — you see every step. The
@@ -353,10 +368,10 @@ API is how a real product would use the desk: another system sends a
 ticket and gets structured JSON back. Same pipeline, two doors in.
 
 **12. How do you know it works — really?**
-Three ways: the tests (13 passing) pin the behaviour, the eval
-measures it (8/8 classification, 8/8 retrieval in mock mode), and CI
-re-runs both on every push. If a change breaks something, one of the
-three catches it before a human has to.
+Three ways: the tests (19 passing) pin the behaviour, the eval
+measures it (9/9 classification, 9/9 retrieval, honesty 1/1 in mock
+mode), and CI re-runs both on every push. If a change breaks
+something, one of the three catches it before a human has to.
 
 **13. What does "mock mode" mean for these numbers?**
 The eval and the tests run against the rule-based mock LLM, not a real
@@ -364,3 +379,29 @@ model — so the 100% scores prove the pipeline, the retrieval, and the
 grounding work, not that a real model classifies perfectly. The honest
 next step is running the same eval with a real API key and reporting
 that number too.
+
+**14. What makes this project different from other support-bot demos?**
+Three things, all measured: it refuses to answer when it has no
+answer (the relevance threshold + "I don't know" + escalation,
+measured by the honesty score); it uses the customer's history
+instead of just storing it (the reply acknowledges repeat customers,
+and repeat unhappy customers are escalated); and everything is
+proven with numbers (19 tests, 9/9 + 9/9 + 1/1 eval, CI on every
+push). Most demos only show the happy path — this one is built
+around the hard cases.
+
+**15. How did you pick the relevance threshold of 10.0?**
+By measuring, not guessing. I scored all 8 real tickets (14.67–
+33.66) and several off-topic questions (at most 8.41 for the Bitcoin
+ticket, 2.43 for the short probe) and put the threshold between
+them. The number is written in `agents/retriever.py` with the
+measurements, so anyone can re-check it — and it must be
+re-measured if the knowledge base changes.
+
+**16. Exactly when does a ticket go to a human?**
+Two rules, both visible in the result as `needs_human_review` with
+a reason: (1) no help article scores above the relevance threshold —
+the desk said "I don't know"; (2) the customer is unhappy
+(negative sentiment) about an urgent problem (high priority) and
+has already written twice before. Everything else gets a draft
+reply the human can send as-is.

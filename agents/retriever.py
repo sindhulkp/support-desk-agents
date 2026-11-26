@@ -35,6 +35,17 @@ def tokenize(text):
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
+# Relevance threshold: a top score below this means "no article really
+# answers this ticket", even if a word or two happens to match.
+# Measured on 2026-11-26: all 8 real sample tickets score 14.67–33.66,
+# while off-topic questions score at most 8.41 (the Bitcoin ticket's
+# "pay"/"order" words weakly match Payment Failed) and 2.43 for the
+# short probe. 10.0 sits cleanly between the two, so the desk says
+# "I don't know" instead of answering from a barely-related article.
+# Re-measure if the knowledge base changes.
+MIN_SCORE = 10.0
+
+
 # Common English words carry almost no meaning for search ("the", "I",
 # "please", ...). Removing them from the QUERY stops them adding noise
 # to the scores, so the ranking reflects the actual topic words.
@@ -105,8 +116,10 @@ class BM25Retriever:
     def search(self, query, top_k=3):
         """Return the top_k most relevant docs as (doc, score) pairs.
 
-        Returns an empty list when nothing matches (score 0 for all docs) —
-        the responder then knows to say "I don't know" instead of guessing.
+        Returns an empty list when nothing matches well enough: either
+        no word overlaps at all, or the best score is below MIN_SCORE
+        (a weak, coincidental match). The responder then knows to say
+        "I don't know" instead of guessing from the wrong article.
         """
         # Drop stopwords so the ranking reflects topic words, not "the"/"I".
         query_words = [w for w in tokenize(query) if w not in STOPWORDS]
@@ -114,4 +127,8 @@ class BM25Retriever:
             (doc, self._score(query_words, i)) for i, doc in enumerate(self.docs)
         ]
         scored.sort(key=lambda pair: pair[1], reverse=True)
-        return [(doc, score) for doc, score in scored[:top_k] if score > 0]
+        return [
+            (doc, score)
+            for doc, score in scored[:top_k]
+            if score >= MIN_SCORE
+        ]

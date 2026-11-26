@@ -24,12 +24,19 @@ Write a short, polite reply to the customer. Follow these rules strictly:
 3. If the articles do not contain the answer, say clearly that you do not
    have that information and that a human agent will follow up. Never guess.
 4. Keep the reply under 150 words. Be warm and direct.
+5. If the customer has written before (see CUSTOMER HISTORY), acknowledge
+   it briefly in one sentence at the start of the reply.
 """
 
 
-def draft_reply(llm, ticket, retrieved_docs):
+def draft_reply(llm, ticket, retrieved_docs, prior_tickets=0,
+                prior_categories=None):
     """Draft a reply. retrieved_docs is a list of (doc, score) from BM25.
 
+    prior_tickets: how many times this customer has written before.
+    prior_categories: the categories of those earlier tickets.
+    Both come from the orchestrator's memory — the reply is written
+    knowing the customer's history, not as if every ticket is the first.
     Returns the reply text.
     """
     if retrieved_docs:
@@ -40,6 +47,15 @@ def draft_reply(llm, ticket, retrieved_docs):
     else:
         articles_text = "NO RELEVANT ARTICLES FOUND"
 
+    history_text = ""
+    if prior_tickets > 0:
+        cats = ", ".join(prior_categories or [])
+        history_text = (
+            f"\n\nCUSTOMER HISTORY: This customer has written "
+            f"{prior_tickets} time(s) before"
+            + (f" about: {cats}." if cats else ".")
+        )
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
@@ -47,6 +63,7 @@ def draft_reply(llm, ticket, retrieved_docs):
             "content": (
                 f"CUSTOMER TICKET:\n{ticket['subject']}\n{ticket['message']}\n\n"
                 f"RETRIEVED ARTICLES:\n{articles_text}"
+                f"{history_text}"
             ),
         },
     ]

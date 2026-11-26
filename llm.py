@@ -142,10 +142,23 @@ class MockLLM:
 
     # -- responder rules --------------------------------------------------
     def _respond(self, user_prompt):
+        # A repeat customer gets one warm sentence up front, naming how
+        # many times they have written before. This is the mock version
+        # of the system prompt's rule 5.
+        ack = ""
+        history = re.search(r"written (\d+) time\(s\) before", user_prompt)
+        if history:
+            n = history.group(1)
+            ack = (
+                f"I can see you've written to us {n} time(s) before — "
+                "thank you for your patience while we sort this out.\n\n"
+            )
+
         # If the retriever found nothing, the honest answer is "I don't know".
         if "NO RELEVANT ARTICLES FOUND" in user_prompt:
             return (
-                "Hi, thanks for reaching out. I checked our help articles and "
+                ack
+                + "Hi, thanks for reaching out. I checked our help articles and "
                 "I don't have information about this in our knowledge base, so "
                 "I don't want to guess. I've passed your ticket to a human "
                 "support agent who will follow up with you shortly."
@@ -168,7 +181,7 @@ class MockLLM:
             "\nIf those steps don't resolve it, please reply and let us know — "
             "we're happy to help further."
         )
-        return "\n".join(lines)
+        return ack + "\n".join(lines)
 
     @staticmethod
     def _first_meaningful_lines(body, max_chars=220):

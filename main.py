@@ -2,7 +2,7 @@
 main.py — the command-line entry point for the support desk.
 
 Usage:
-  python main.py --demo                 Run 3 sample tickets with the
+  python main.py --demo                 Run 4 sample tickets with the
                                          built-in fake LLM (no API key).
   python main.py --ticket T-1001        Run one ticket with the real LLM
                                          (needs LLM_API_KEY in .env).
@@ -20,8 +20,10 @@ from config import setup_logging
 from llm import get_llm
 from tools import get_ticket, knowledge_dir, load_env_file, load_tickets
 
-# Which tickets the demo runs (one per category, so you see variety).
-DEMO_TICKETS = ["T-1001", "T-1003", "T-1004"]
+# Which tickets the demo runs: one per category, plus T-1009 — the
+# question no help article answers, so the desk must say "I don't
+# know" and hand it to a human instead of guessing.
+DEMO_TICKETS = ["T-1001", "T-1003", "T-1004", "T-1009"]
 
 
 def main():

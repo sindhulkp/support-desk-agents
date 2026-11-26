@@ -34,9 +34,16 @@ def test_top1_matches_expected_article_for_three_tickets():
 
 
 def test_all_tickets_retrieve_an_expected_article():
-    """Stronger check: every sample ticket's top-1 is an expected article."""
+    """Stronger check: every sample ticket's top-1 is an expected article.
+
+    Tickets with no expected articles (T-1009: nothing in the knowledge
+    base answers it) are skipped here — for them, retrieving nothing is
+    the correct behaviour, and test_uniqueness.py checks that.
+    """
     retriever = _retriever()
     for ticket in load_tickets():
+        if not ticket["expected"]["articles"]:
+            continue
         results = retriever.search(f"{ticket['subject']} {ticket['message']}", top_k=3)
         assert results, f"no articles found for {ticket['id']}"
         assert results[0][0]["title"] in ticket["expected"]["articles"]
@@ -47,4 +54,15 @@ def test_no_match_returns_empty_list():
     says 'I don't know' instead of guessing."""
     retriever = _retriever()
     results = retriever.search("zebra quantum trombone blorp", top_k=3)
+    assert results == []
+
+
+def test_weak_match_below_threshold_returns_empty_list():
+    """A real question the knowledge base does not cover must also
+    return [] — even though a word or two happens to match ("payment"
+    appears in Payment Failed), the best score (2.43) is below the
+    relevance threshold, so the desk admits it has no answer instead
+    of replying from a barely-related article."""
+    retriever = _retriever()
+    results = retriever.search("Do you accept Bitcoin as payment?", top_k=3)
     assert results == []

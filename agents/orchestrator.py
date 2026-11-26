@@ -14,8 +14,15 @@ which is the simplest multi-agent pattern (a "pipeline" / "chain").
 
 It also keeps per-customer memory: after each ticket it records the
 ticket in memory.json, so the next time the same customer writes in,
-the desk can see their history. Memory is what turns a one-off chatbot
-into an agent that remembers.
+the desk can see their history — and USES it: the reply acknowledges
+a repeat customer, and a repeat unhappy customer with an urgent
+problem is escalated to a human instead of getting another auto-reply.
+Memory is what turns a one-off chatbot into an agent that remembers.
+
+Finally, the orchestrator decides when NOT to answer: if no help
+article really answers the ticket (the retriever's relevance
+threshold), the desk says "I don't know" and flags the ticket for a
+human, rather than drafting a reply from the wrong article.
 
 Logging: every pipeline step also writes exactly one structured log line
 (key=value pairs), so the run can be followed in a log file as well as on
@@ -116,8 +123,26 @@ class SupportDesk:
                 f"top 3 articles: {found}",
             )
 
+        # -- Memory: read this customer's history BEFORE replying ---------
+        # Most support bots save memory and never use it. Here the reply
+        # is written knowing the customer's history: a repeat customer
+        # gets acknowledged, and a repeat angry customer gets escalated
+        # to a human instead of another auto-reply.
+        memory = load_memory()
+        history = memory.get(ticket["customer_id"], [])
+        prior_tickets = len(history)
+        prior_categories = [h["category"] for h in history]
+        logger.info(
+            "step=memory ticket_id=%s customer_id=%s prior_tickets=%d",
+            ticket["id"], ticket["customer_id"], prior_tickets,
+        )
+
         # -- Step 3: respond -------------------------------------------------
-        reply = draft_reply(self.llm, ticket, retrieved)
+        reply = draft_reply(
+            self.llm, ticket, retrieved,
+            prior_tickets=prior_tickets,
+            prior_categories=prior_categories,
+        )
         logger.info(
             "step=respond ticket_id=%s reply_chars=%d",
             ticket["id"], len(reply),
@@ -133,9 +158,45 @@ class SupportDesk:
         if not quiet:
             print(f"\n>>> DRAFT REPLY (to {ticket['customer_name']}):\n{reply}\n")
 
-        # -- Memory: remember this ticket for this customer ------------------
-        memory = load_memory()
-        history = memory.setdefault(ticket["customer_id"], [])
+        # -- Escalation: know when NOT to auto-reply -------------------------
+        # A bot that answers everything is not helpful — it is risky.
+        # This ticket goes to a human when:
+        #   * no help article answers it (the honest "I don't know" case), or
+        #   * an unhappy customer with an urgent problem has already
+        #     written twice before (a repeat complaint needs a person).
+        needs_human_review = False
+        escalation_reason = None
+        if not retrieved:
+            needs_human_review = True
+            escalation_reason = (
+                "No help article answers this ticket — the desk said "
+                "'I don't know' instead of guessing."
+            )
+        elif (
+            classification["priority"] == "high"
+            and classification["sentiment"] == "negative"
+            and prior_tickets >= 2
+        ):
+            needs_human_review = True
+            escalation_reason = (
+                f"Repeat customer ({prior_tickets} prior tickets) with an "
+                "urgent, unhappy ticket — needs a human, not another auto-reply."
+            )
+        logger.info(
+            "step=escalate ticket_id=%s needs_human_review=%s",
+            ticket["id"], needs_human_review,
+        )
+        if verbose and not quiet:
+            if prior_tickets > 0:
+                print(f"[memory] Customer {ticket['customer_id']} has "
+                      f"{prior_tickets} prior ticket(s) on file "
+                      f"({', '.join(prior_categories)}).")
+            if needs_human_review:
+                print(f"[escalation] HUMAN REVIEW NEEDED — {escalation_reason}")
+            else:
+                print("[escalation] No escalation — safe to send the draft reply.")
+
+        # -- Memory: record this ticket for next time ------------------------
         history.append(
             {
                 "ticket_id": ticket["id"],
@@ -143,6 +204,7 @@ class SupportDesk:
                 "priority": classification["priority"],
             }
         )
+        memory[ticket["customer_id"]] = history
         save_memory(memory)
         logger.info(
             "step=memory ticket_id=%s customer_id=%s total_tickets=%d",
@@ -160,4 +222,7 @@ class SupportDesk:
                 for doc, score in retrieved
             ],
             "reply": reply,
+            "prior_tickets": prior_tickets,
+            "needs_human_review": needs_human_review,
+            "escalation_reason": escalation_reason,
         }

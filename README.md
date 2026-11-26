@@ -7,8 +7,8 @@ and one drafts a grounded reply. The project also keeps per-customer
 memory in a JSON file.
 
 It is now a **real, runnable service**, not just a demo script: a FastAPI
-API, 13 automated tests, an eval script that scores the pipeline on all
-8 sample tickets, CI on every push, and a Dockerfile.
+API, 19 automated tests, an eval script that scores the pipeline on all
+9 sample tickets, CI on every push, and a Dockerfile.
 
 Built for a beginner learning agentic AI and prompt engineering. Every
 file is commented, and `EXPLANATION.md` walks through the whole project
@@ -39,6 +39,28 @@ Ticket arrives
 (THINK → ACT → OBSERVE), RAG (retrieval-augmented generation), structured
 JSON output, grounded generation with citations, per-customer memory,
 structured logging, and a tested HTTP API.
+
+## What makes this different from other support-bot projects
+
+Most demos answer every ticket. This one is built around the moments
+that matter more — and each one is measured, not just claimed:
+
+- **It says "I don't know" — and means it.** The retriever has a
+  relevance threshold (measured: real tickets score 14.67–33.66,
+  off-topic questions at most 8.41). Below it, no article is returned,
+  the responder refuses to guess, and the ticket is flagged for a
+  human. Ticket T-1009 ("Do you accept Bitcoin?") proves it.
+- **It knows when to hand off to a human.** A ticket is escalated
+  when no article answers it, or when an unhappy customer with an
+  urgent problem has already written twice before. Everything else
+  gets a draft reply; the hard cases get a person.
+- **It remembers — and uses it.** Memory is not just stored. The
+  reply acknowledges a returning customer, and the escalation rule
+  reads their history. A repeat complaint is treated differently
+  from a first contact.
+- **It is measured three ways.** 19 tests, an eval (9/9
+  classification, 9/9 retrieval, honesty 1/1 in mock mode), and CI
+  on every push — so "it works" is a number, not a feeling.
 
 ## Setup
 
@@ -84,7 +106,8 @@ python -c "import json; [print(t['id'], '-', t['subject']) for t in json.load(op
 
 Sample tickets: `T-1001` double charge, `T-1002` password reset,
 `T-1003` stuck tracking, `T-1004` damaged headphones, `T-1005` refund
-status, `T-1006` app crash, `T-1007` address change, `T-1008` late return.
+status, `T-1006` app crash, `T-1007` address change, `T-1008` late return,
+`T-1009` Bitcoin question (no article covers it — the "I don't know" case).
 
 ## Run it (API)
 
@@ -122,13 +145,15 @@ Interactive docs are at `http://127.0.0.1:8000/docs`.
 ## Tests and eval
 
 ```bash
-# 13 tests: retriever ranking, classifier shape, end-to-end pipeline, API
+# 19 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
+# plus the behaviours that make this desk different (honesty, memory, escalation)
 python -m pytest -q
 
-# Eval: run all 8 tickets in mock mode and score them
+# Eval: run all 9 tickets in mock mode and score them
 python eval.py
-# Classification accuracy : 8/8 (100%)
-# Retrieval top-1 hit rate: 8/8 (100%)
+# Classification accuracy : 9/9 (100%)
+# Retrieval top-1 hit rate: 9/9 (100%)
+# Honesty (says I don't know + escalates): 1/1
 ```
 
 Each ticket in `data/tickets.json` carries an `"expected"` label
@@ -181,7 +206,7 @@ things that change.
 support-desk-agents/
 ├── main.py                 # CLI entry point (--demo / --ticket)
 ├── api.py                  # FastAPI service: /health, POST /tickets, GET /tickets/{id}
-├── eval.py                 # scores the pipeline on all 8 tickets (mock mode)
+├── eval.py                 # scores the pipeline on all 9 tickets (mock mode)
 ├── config.py               # central settings from env vars + logging setup
 ├── llm.py                  # LLM wrapper + mock LLM (the only API code)
 ├── tools.py                # loads tickets, knowledge base, .env
@@ -200,7 +225,7 @@ support-desk-agents/
 ├── .github/workflows/ci.yml  # CI: pytest + demo on every push
 ├── Dockerfile              # container for the API (python:3.12-slim)
 ├── data/
-│   └── tickets.json        # 8 sample tickets, each with an "expected" label
+│   └── tickets.json        # 9 sample tickets, each with an "expected" label
 ├── knowledge/              # 7 help articles (the RAG knowledge base)
 │   ├── refund-policy.md
 │   ├── password-reset.md
@@ -235,7 +260,9 @@ support-desk-agents/
   meanings. A ticket saying "money taken twice" won't match an article
   that only says "duplicate charge" unless the words overlap. That is a
   real limitation worth mentioning to your manager — and a natural next
-  step is embedding-based (vector) retrieval.
+  step is embedding-based (vector) retrieval. The relevance threshold
+  (10.0) softens this: a weak keyword coincidence no longer produces
+  an answer from the wrong article, it produces "I don't know".
 - The API has no auth and the "database" is a local JSON file
   (`results.json` / `memory.json`). Fine for a demo; a production
   service would add auth and a real database.
