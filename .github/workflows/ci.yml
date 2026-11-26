@@ -1,0 +1,21 @@
+# CI: on every push, install dependencies, run the tests, and run the demo.
+# The demo and tests use the built-in mock LLM, so no API key is needed
+# in CI — no secrets are stored in this repo.
+name: CI
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r dev-requirements.txt
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Run the demo (mock mode, no API key)
+        run: python main.py --demo
