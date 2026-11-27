@@ -67,7 +67,7 @@ that matter more — and each one is measured, not just claimed:
   number that does not exist (`#9999`) gets an honest "I couldn't
   find that order", never an invented status. Ticket T-1003 names its
   real order, ORD-1003, which is Delayed — and the reply says so.
-- **It is measured three ways.** 33 tests, an eval (9/9
+- **It is measured three ways.** 49 tests, an eval (9/9
   classification, 9/9 retrieval, honesty 1/1, order lookup 2/2 in
   mock mode), and CI on every push — so "it works" is a number, not a
   feeling.
@@ -174,14 +174,14 @@ curl http://127.0.0.1:8000/stats
 Without an API key the API runs in mock mode (same fake LLM as
 `--demo`). With `LLM_API_KEY` in `.env` it uses the real LLM.
 Interactive docs are at `http://127.0.0.1:8000/docs`.
-Open `http://127.0.0.1:8000/` in a browser for the live demo page and
+Open `http://127.0.0.1:8000/` in a browser for the support page and
 operations dashboard — it talks to the same API, no extra setup.
 
 ## Tests and eval
 
 ```bash
-# 33 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
-# order lookup, customer identity — plus the behaviours that make this
+# 49 tests: retriever ranking, classifier shape, end-to-end pipeline, API,
+# order lookup, customer identity, demo sign-in — plus the behaviours that make this
 # desk different (honesty, memory, escalation)
 python -m pytest -q
 
@@ -319,6 +319,7 @@ support-desk-agents/
   `#1001`). A bare number ("I have 2 orders") is deliberately not
   treated as an order id, and the orders "database" is a JSON file —
   fine for a demo; a production service would use a real database.
-- The API has no auth and the "database" is a local JSON file
-  (`results.json` / `memory.json`). Fine for a demo; a production
-  service would add auth and a real database.
+- The API has only a demo-only sign-in (three public accounts, one
+  shared password printed on the page) and the "database" is a local
+  JSON file (`results.json` / `memory.json`). Fine for a demo; a
+  production service would add real auth and a real database.

@@ -22,14 +22,19 @@ def test_health_returns_ok_and_mock_mode():
     assert body["tickets_processed"] == 0
 
 
-def test_homepage_serves_the_live_demo_page():
-    """GET / serves the demo frontend (the page anyone opens), not JSON."""
+def test_homepage_serves_the_support_page():
+    """GET / serves the shop support page (sign-in + write to us),
+    not JSON — and it reads like a shop, not a project write-up."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "Support Desk Agents" in response.text
-    assert "Run the agents" in response.text
+    assert "Shop Support" in response.text
+    assert "Sign in to track your orders" in response.text
+    assert "Send message" in response.text
     # The page must not depend on any outside service or branding.
     assert "muse.ai" not in response.text
+    # No project explanation anywhere on the page.
+    assert "Built with Python" not in response.text
+    assert "github.com" not in response.text
 
 
 def test_post_sample_ticket_and_get_stored_result():

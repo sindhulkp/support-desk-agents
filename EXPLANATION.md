@@ -60,6 +60,38 @@ actual order, instead of quoting a generic tracking article.
 Afterwards the system saves the ticket in `memory.json`, so the next
 time the same customer writes in, the desk knows their history.
 
+## 2A. Customer sign-in: orders, refunds, and past messages in one place
+
+On the website, a customer can sign in and see everything about
+their orders in one view — each order's status, items, total,
+delivery date, carrier and tracking, its refund status, and below
+that, their past messages with us and whether each one was answered
+or passed to a human. Most shops split those three things across
+three different pages; here one sign-in shows them together. A
+delayed order says what happens next in plain language instead of
+just showing the word "Delayed".
+
+There is no sign-up: three demo accounts are printed on the sign-in
+card, all with the password `demo1234`, and clicking one signs you
+straight in:
+
+- **priya.sharma@example.com** — Priya Sharma: a Shipped order and a Processing order, no refund.
+- **sofia.khan@example.com** — Sofia Khan: a Delayed order (ORD-1003) with a refund requested.
+- **ava.brown@example.com** — Ava Brown: a Delivered order (ORD-1008) with a refund approved.
+
+The refund data lives on the order itself in `data/orders.json`
+(each order has a `"refund"` field: `null` when there is no refund,
+or the status, amount, and dates when there is). The page never
+invents a refund where none exists — an order with no refund says
+so plainly. The sign-in is demo-only: one shared public password,
+no password storage, no real accounts. Production would need real
+authentication; this is here so anyone can try the tracking view
+instantly. The endpoints are `POST /login`,
+`GET /customers/{id}/orders`, and `GET /customers/{id}/tickets` in
+`api.py`, and the no-sign-in path still works exactly as before —
+writing "Where is my order #1001?" in the message box still looks
+the order up and answers with its real status.
+
 ## 3. The agent loop, exactly as it happens here
 
 Run `python main.py --demo` and you will see each step printed as
@@ -146,7 +178,7 @@ natural "next step" for this project (see §9).
 | File | What it does | Key idea to remember |
 |---|---|---|
 | `main.py` | Command line: `--demo`, `--ticket T-1001`, `--mock` | The entry point; parses arguments and starts the desk |
-| `api.py` | FastAPI service: `GET /health`, `POST /tickets`, `GET /tickets/{id}`, `GET /stats` | The same pipeline, behind HTTP, so other programs can use it |
+| `api.py` | FastAPI service: `GET /health`, `POST /tickets`, `GET /tickets/{id}`, `GET /stats`, plus `POST /login` and `GET /customers/{id}/orders` and `/tickets` for the sign-in view | The same pipeline, behind HTTP, so other programs can use it |
 | `eval.py` | Runs all 9 tickets in mock mode, prints accuracy + hit rate + honesty + order lookup | Measurement: proves the pipeline works instead of claiming it |
 | `config.py` | Central settings from env vars + `setup_logging()` | One place for config; values read on access, never hardcoded |
 | `llm.py` | `LLMClient` (real API) + `MockLLM` (fake, rule-based) | Only file that talks to an LLM; config comes from env vars only |
@@ -160,7 +192,7 @@ natural "next step" for this project (see §9).
 | `.github/workflows/ci.yml` | CI: install, pytest, demo on every push | Automation: every push is checked, no key needed (mock mode) |
 | `Dockerfile` | Container for the API (`python:3.12-slim` + uvicorn) | Same code, same run, on any machine |
 | `data/tickets.json` | 9 sample tickets (billing, technical, shipping, returns) | Realistic input data — each ticket now has an `"expected"` label; T-1003 names its real order ORD-1003 |
-| `data/orders.json` | 8 real orders (ORD-1001–ORD-1008) with live statuses | The orders database the lookup answers from |
+| `data/orders.json` | 8 real orders (ORD-1001–ORD-1008) with live statuses and a `"refund"` field on each order | The orders database the lookup answers from — and the sign-in view reads refunds from it |
 | `knowledge/*.md` | 7 help articles (the RAG knowledge base) | Facts the responder is allowed to use |
 | `memory.json` | Created on first run | Per-customer ticket history |
 | `results.json` | Created by the API | Stored pipeline results, so `GET /tickets/{id}` can answer |
@@ -228,6 +260,14 @@ curl -X POST http://127.0.0.1:8000/tickets -H "Content-Type: application/json" -
 #  ORD-1001 in the shop's own orders file and answered with its real
 #  status: Shipped, with the items and the delivery date. Try #9999
 #  and it says honestly that the order does not exist."
+
+# 7. Show the sign-in on the site (30 seconds) — the unified view:
+curl -X POST http://127.0.0.1:8000/login -H "Content-Type: application/json" -d '{"email": "sofia.khan@example.com", "password": "demo1234"}'
+curl http://127.0.0.1:8000/customers/C-103/orders
+# "One sign-in, and Sofia sees her delayed order, her refund
+#  requested, and her past messages — order status, refund status,
+#  and support history together, where most shops make you visit
+#  three different pages."
 ```
 
 If you have a real API key, run one ticket without `--mock` to show
@@ -253,8 +293,10 @@ instructions. This project shows three techniques:
 
 - **Semantic search:** replace BM25 with embeddings so "money taken
   twice" matches "duplicate charge".
-- **Auth and a real database:** the API has no auth and stores results
-  in a JSON file — fine for a demo, but production needs both.
+- **Auth and a real database:** the API has only a demo-only sign-in
+  (three public accounts, one shared password printed on the page)
+  and stores results in a JSON file — fine for a demo, but production
+  needs real authentication and a database.
 
 Already done (so don't list these as "next"): the API, the tests, the
 eval script, structured logging, central config, CI, and Docker — see
@@ -313,9 +355,10 @@ model to `gemini-2.0-flash`. No code changes.
 
 **9. What are the limitations?**
 Keyword search misses paraphrases; the mock LLM's answers are simple;
-memory is a local JSON file, not a database; the API has no auth; the
-escalation rules are fixed (high + negative + 2 prior tickets), not
-learned from data.
+memory is a local JSON file, not a database; the API has only a demo
+sign-in (three public accounts, one shared password on the page), not
+real authentication; the escalation rules are fixed (high + negative +
+2 prior tickets), not learned from data.
 
 **10. How would you put this in production?**
 Add a human approval queue for high-priority tickets, swap BM25 for
@@ -335,8 +378,13 @@ what this layer does:
   lines still record every step), stores the result in `results.json`,
   and returns it as JSON. `GET /tickets/{id}` fetches a stored result.
   `GET /health` reports status, LLM mode, and how many tickets have
-  been processed. Without a key it runs in mock mode; with a key it
-  uses the real LLM. There is no auth — say that plainly if asked.
+  been processed. The sign-in view is three more endpoints:
+  `POST /login` checks one of three public demo accounts (password
+  `demo1234`, printed on the homepage — demo-only, not real security),
+  `GET /customers/{id}/orders` returns that customer's orders with
+  their refund on each one, and `GET /customers/{id}/tickets` returns
+  their processed tickets as answered or passed to a human. Without a
+  key it runs in mock mode; with a key it uses the real LLM.
 - **Config (`config.py`).** Every setting lives in one place and comes
   from the environment (`LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`,
   `MOCK_LLM`, `LOG_LEVEL`, `API_HOST`, `API_PORT`). Values are read
@@ -347,7 +395,7 @@ what this layer does:
   priority=high`. The CLI's THINK / ACT / OBSERVE prints are the
   human-readable demo; the log lines are the machine-readable record,
   and you can follow one ticket with `grep ticket_id=T-1001 app.log`.
-- **Tests (`tests/`, 33 tests, pytest).** Six areas: the retriever
+- **Tests (`tests/`, 49 tests, pytest).** Six areas: the retriever
   ranks the expected article first (and stays silent below the
   relevance threshold); the classifier returns valid JSON with the
   three fields and the right categories; the end-to-end pipeline
@@ -355,7 +403,10 @@ what this layer does:
   extracts order ids, finds real orders, and honestly reports missing
   ones; the API endpoints answer, store, and 404 correctly, and
   identify customers from email or name (or treat a ticket as
-  anonymous); and the uniqueness behaviours —
+  anonymous); the demo sign-in accepts the three demo accounts,
+  rejects wrong credentials with a 401, returns only that customer's
+  orders with their refund status, and lists their processed tickets
+  (empty-safe); and the uniqueness behaviours —
   the desk says "I don't know" and escalates off-topic tickets,
   acknowledges repeat customers, and escalates repeat unhappy ones.
   A `conftest.py` fixture points memory and results at a temp folder,
@@ -383,7 +434,7 @@ what this layer does:
 How to explain this layer to your manager, in one breath:
 
 > "The agents are the core, but I also made it a real service: an API
-> so other systems can send tickets, 33 automated tests, an eval script
+> so other systems can send tickets, 49 automated tests, an eval script
 > that scores the pipeline 9 out of 9 on classification and retrieval
 > plus 1 out of 1 on honesty and 2 out of 2 on order lookup, CI that
 > checks every push, and a Docker image so it runs the same everywhere.
@@ -396,7 +447,7 @@ API is how a real product would use the desk: another system sends a
 ticket and gets structured JSON back. Same pipeline, two doors in.
 
 **12. How do you know it works — really?**
-Three ways: the tests (33 passing) pin the behaviour, the eval
+Three ways: the tests (49 passing) pin the behaviour, the eval
 measures it (9/9 classification, 9/9 retrieval, honesty 1/1, order
 lookup 2/2 in mock mode), and CI re-runs both on every push. If a
 change breaks something, one of the three catches it before a human
@@ -410,16 +461,19 @@ next step is running the same eval with a real API key and reporting
 that number too.
 
 **14. What makes this project different from other support-bot demos?**
-Four things, all measured: it refuses to answer when it has no
+Five things, all measured: it refuses to answer when it has no
 answer (the relevance threshold + "I don't know" + escalation,
 measured by the honesty score); it uses the customer's history
 instead of just storing it (the reply acknowledges repeat customers,
 and repeat unhappy customers are escalated); it answers "where is my
 order?" from a real orders file instead of a generic article (and
 honestly says when the order does not exist, measured by the order
-lookup score); and everything is proven with numbers (33 tests, 9/9 +
-9/9 + 1/1 + 2/2 eval, CI on every push). Most demos only show the
-happy path — this one is built around the hard cases.
+lookup score); one sign-in shows order status, refund status, and
+past messages together, where most shops split them across three
+different pages — and the sign-in needs no signup, the demo accounts
+are printed on the page; and everything is proven with numbers (49
+tests, 9/9 + 9/9 + 1/1 + 2/2 eval, CI on every push). Most demos only
+show the happy path — this one is built around the hard cases.
 
 **15. How did you pick the relevance threshold of 10.0?**
 By measuring, not guessing. I scored all 8 real tickets (15.49–
@@ -469,3 +523,9 @@ the reply never claims a repeat visit that did not happen. Before
 this fix every form ticket shared one default customer id, so a
 first-time stranger's reply wrongly said "you've written to us 1
 time(s) before".
+
+**20. How does a customer check an order or a refund?**
+They sign in on the homepage — no sign-up, the demo accounts are
+printed on the card — and one page shows their orders with status
+and delivery date, each order's refund status, and their past
+messages with us.

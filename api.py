@@ -7,6 +7,9 @@ other program can use it:
   GET  /health               — is the service up? Which LLM mode is it in?
   POST /tickets              — run the full pipeline on a ticket
   GET  /tickets/{ticket_id}  — fetch the stored result of a processed ticket
+  POST /login                — sign in with a demo customer account
+  GET  /customers/{id}/orders  — that customer's orders, with refund info
+  GET  /customers/{id}/tickets — that customer's processed tickets
 
 Run it:
   uvicorn api:app --reload
@@ -25,11 +28,15 @@ neither, the ticket is anonymous — it is processed, but no history
 is recorded and the reply never claims a repeat visit that did not
 happen. Sample tickets (ticket_id) keep their own customer ids.
 
+Demo sign-in: the login endpoint checks three public demo accounts
+(password "demo1234" for all three — printed on the homepage so
+anyone can try it instantly). These are sample data only, not real
+security: there is no signup, no password storage, and no real
+authentication. Do not treat this as a production login system.
+
 How the LLM is chosen: if LLM_API_KEY is set in the environment (or a
 .env file), the real LLM is used; otherwise the built-in mock LLM runs
 the pipeline. Set MOCK_LLM=1 to force mock mode even with a key.
-This is a learning project: there is no auth — do not expose it to the
-internet as it is.
 """
 
 import json
@@ -43,6 +50,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from agents.orchestrator import SupportDesk
+from agents.order_lookup import load_orders
 from config import settings, setup_logging
 from llm import MockLLM, get_llm
 from tools import get_ticket, knowledge_dir, load_env_file, load_tickets
@@ -54,9 +62,9 @@ setup_logging()
 logger = logging.getLogger("support_desk")
 
 app = FastAPI(
-    title="Support Desk Agents",
-    description="Multi-agent customer support desk with RAG.",
-    version="0.2.0",
+    title="Shop Support",
+    description="Customer support desk — track orders and refunds, or write to us.",
+    version="0.3.0",
 )
 
 # -- in-memory store of processed results -----------------------------------
@@ -138,9 +146,9 @@ def _customer_identity(body: TicketRequest):
 # -- endpoints ----------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 def home():
-    """Serve the live demo page: pick a sample ticket (or write your own)
-    and run it through the real pipeline in the browser. Same origin as
-    the API, so the page needs no extra configuration or CORS."""
+    """Serve the support page: sign in to track orders and refunds,
+    or write to us. Same origin as the API, so the page needs no
+    extra configuration or CORS."""
     return FileResponse(os.path.join(BASE_DIR, "static", "index.html"))
 
 
@@ -200,6 +208,107 @@ def get_result(ticket_id: str):
             status_code=404, detail=f"no stored result for ticket {ticket_id}"
         )
     return result
+
+
+# -- demo customer sign-in ---------------------------------------------------
+# Public demo accounts so anyone can try the tracking page instantly —
+# no signup, no verification email. The password is printed on the
+# homepage. These are sample customers from data/orders.json, not real
+# people and not real security: do not reuse this pattern for real
+# accounts (real sign-in needs hashed passwords and a real database).
+DEMO_ACCOUNTS = {
+    "priya.sharma@example.com": {
+        "password": "demo1234",
+        "customer_id": "C-101",
+        "name": "Priya Sharma",
+    },
+    "sofia.khan@example.com": {
+        "password": "demo1234",
+        "customer_id": "C-103",
+        "name": "Sofia Khan",
+    },
+    "ava.brown@example.com": {
+        "password": "demo1234",
+        "customer_id": "C-107",
+        "name": "Ava Brown",
+    },
+}
+
+
+class LoginRequest(BaseModel):
+    """POST /login body: an email and a password."""
+    email: str = ""
+    password: str = ""
+
+
+@app.post("/login")
+def login(body: LoginRequest):
+    """Sign in with a demo customer account. Email is matched
+    case-insensitively; a wrong email or password is a 401, with no
+    hint about which one was wrong."""
+    email = (body.email or "").strip().lower()
+    account = DEMO_ACCOUNTS.get(email)
+    if account is None or body.password != account["password"]:
+        raise HTTPException(
+            status_code=401, detail="email or password is not recognised"
+        )
+    return {
+        "id": account["customer_id"],
+        "name": account["name"],
+        "email": email,
+    }
+
+
+def _customer_email(customer_id: str):
+    """The email on file for a customer id, from the orders file —
+    needed because tickets are stored under either the customer id
+    (sample tickets) or the lowercased email (tickets written in)."""
+    for order in load_orders():
+        if order["customer_id"].lower() == customer_id.lower():
+            return order["email"].lower()
+    return None
+
+
+@app.get("/customers/{customer_id}/orders")
+def customer_orders(customer_id: str):
+    """That customer's orders only — items, total, status, delivery
+    date, carrier and tracking, plus the refund on each order (null
+    when there is no refund — a refund is never invented). An unknown
+    customer id has no orders, so the answer is an empty list."""
+    return [
+        order
+        for order in load_orders()
+        if order["customer_id"].lower() == customer_id.lower()
+    ]
+
+
+@app.get("/customers/{customer_id}/tickets")
+def customer_tickets(customer_id: str):
+    """That customer's processed tickets — subject, whether it was
+    answered or passed to a human, and when it was processed. A
+    customer with no tickets yet gets an empty list, not an error.
+    Matches both id forms: the "C-101" id on sample tickets and the
+    lowercased email on tickets written in through the form."""
+    _load_results()
+    email = _customer_email(customer_id)
+    wanted = {customer_id.lower()} | ({email} if email else set())
+    mine = []
+    for ticket_id, result in _RESULTS.items():
+        ticket = result["ticket"]
+        if (ticket.get("customer_id") or "").lower() not in wanted:
+            continue
+        mine.append({
+            "id": ticket_id,
+            "subject": ticket["subject"],
+            "status": (
+                "passed to a human"
+                if result.get("needs_human_review")
+                else "answered"
+            ),
+            "processed_at": result.get("processed_at"),
+        })
+    mine.sort(key=lambda t: t["processed_at"] or "", reverse=True)
+    return mine
 
 
 @app.get("/stats")
